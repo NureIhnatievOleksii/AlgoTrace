@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="algotrace.client/algotrace.client.esproj">
+    <Build />
+    <Deploy />
+  </Project>
+  <Project Path="AlgoTrace.Server/AlgoTrace.Server.csproj" />
+</Solution>
