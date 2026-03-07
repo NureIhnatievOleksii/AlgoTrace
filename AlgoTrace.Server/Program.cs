@@ -3,6 +3,9 @@ using AlgoTrace.Server.Models;
 using AlgoTrace.Server.Interfaces;
 using AlgoTrace.Server.Services;
 using AlgoTrace.Server.Algorithms;
+using AlgoTrace.Server.Algorithms.Graph;
+using AlgoTrace.Server.Algorithms.Metric;
+using AlgoTrace.Server.Models.DTO;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
@@ -24,6 +27,17 @@ builder.Services.AddScoped<ITextAlgorithm, RabinKarpAlgorithm>();
 builder.Services.AddScoped<ITextAlgorithm, LevenshteinAlgorithm>();
 builder.Services.AddScoped<ITextAlgorithm, NgramAlgorithm>();
 builder.Services.AddScoped<ITextAnalysisService, TextAnalysisService>();
+
+// Graph Analysis Services
+builder.Services.AddScoped<IGraphAlgorithm, ControlFlowGraphAlgorithm>();
+builder.Services.AddScoped<IGraphAlgorithm, ProgramDependenceGraphAlgorithm>();
+builder.Services.AddScoped<IGraphAlgorithm, SubgraphIsomorphismAlgorithm>();
+builder.Services.AddScoped<IGraphAnalysisService, GraphAnalysisService>();
+
+// Metric Analysis Services
+builder.Services.AddScoped<IMetricAlgorithm, HalsteadMetricsAlgorithm>();
+builder.Services.AddScoped<IMetricAlgorithm, McCabeComplexityAlgorithm>();
+builder.Services.AddScoped<IMetricAnalysisService, MetricAnalysisService>();
 
 var app = builder.Build();
 
