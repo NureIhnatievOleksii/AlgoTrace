@@ -85,7 +85,7 @@ namespace AlgoTrace.Server.Services
                 }
             }
             result.Add(current);
-            
+
             for (int i = 0; i < result.Count; i++) result[i].Id = i + 1;
 
             return result;

@@ -4,7 +4,8 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace AlgoTrace.Server.Interfaces
 {
-    public interface ITextAlgorithm {
+    public interface ITextAlgorithm
+    {
         string Name { get; }
         List<DetailedMatch> Execute(string source, string target, out double similarityScore);
     }
