@@ -13,21 +13,17 @@ namespace AlgoTrace.Server.Algorithms.Metric
             var metricsA = MetricUtils.CalculateHalsteadMetrics(sourceCode);
             var metricsB = MetricUtils.CalculateHalsteadMetrics(targetCode);
 
-            // Compare Volume (V) as a primary indicator of content similarity
             double v1 = metricsA.Volume;
             double v2 = metricsB.Volume;
             
-            // Avoid division by zero
             double maxV = Math.Max(v1, v2);
             if (maxV == 0) maxV = 1;
 
-            // Similarity based on relative difference
             double diff = Math.Abs(v1 - v2);
             similarityScore = Math.Max(0, (1 - (diff / maxV)) * 100);
 
             var matches = new List<DetailedMatch>();
 
-            // If similarity is high, we return a "global" match for the file
             if (similarityScore > 70)
             {
                 int linesA = sourceCode.Split('\n').Length;

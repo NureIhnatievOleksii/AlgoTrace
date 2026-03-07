@@ -17,8 +17,6 @@ namespace AlgoTrace.Server.Services
             double maxScore = 0;
             var requestedMethods = request.AnalysisConfig?.Methods ?? new List<string>();
 
-            // Simple 1-to-1 comparison of the first file in each submission for demonstration
-            // In production, this would iterate all file combinations
             var fileA = request.SubmissionA.Files.FirstOrDefault();
             var fileB = request.SubmissionB.Files.FirstOrDefault();
 
@@ -26,23 +24,21 @@ namespace AlgoTrace.Server.Services
             {
                 foreach (var algo in _algorithms)
                 {
-                    // Execute only requested methods, or all if none specified
                     if (requestedMethods.Any() && !requestedMethods.Contains(algo.Key))
                         continue;
 
                     var matches = algo.Execute(
-                        fileA.Content, 
-                        fileB.Content, 
-                        request.AnalysisConfig?.Parameters, 
+                        fileA.Content,
+                        fileB.Content,
+                        request.AnalysisConfig?.Parameters,
                         out double score
                     );
-                    
+
                     allMatches.AddRange(matches);
                     if (score > maxScore) maxScore = score;
                 }
             }
 
-            // Construct response using existing DTOs
             return new AnalysisResponseDto
             {
                 Info = new AnalysisInfo
@@ -61,7 +57,7 @@ namespace AlgoTrace.Server.Services
                         }
                     }
                 },
-                ReferenceTree = new List<NodeDto>() // Populated as needed
+                ReferenceTree = new List<NodeDto>() 
             };
         }
     }

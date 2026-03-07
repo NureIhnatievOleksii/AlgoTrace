@@ -13,7 +13,6 @@ namespace AlgoTrace.Server.Algorithms.Metric
             int c1 = MetricUtils.CalculateMcCabeComplexity(sourceCode);
             int c2 = MetricUtils.CalculateMcCabeComplexity(targetCode);
 
-            // Compare complexity values
             double maxC = Math.Max(c1, c2);
             if (maxC == 0) maxC = 1;
 
@@ -22,7 +21,6 @@ namespace AlgoTrace.Server.Algorithms.Metric
 
             var matches = new List<DetailedMatch>();
 
-            // If complexities are very close, it suggests similar control flow structure
             if (similarityScore > 80)
             {
                 int linesA = sourceCode.Split('\n').Length;

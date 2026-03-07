@@ -7,7 +7,7 @@ namespace AlgoTrace.Server.Algorithms.Graph
         public int Id { get; set; }
         public int LineIndex { get; set; }
         public string Content { get; set; }
-        public string Type { get; set; } // "statement", "control", "def"
+        public string Type { get; set; }
         public HashSet<string> Variables { get; set; } = new();
     }
 
@@ -15,7 +15,7 @@ namespace AlgoTrace.Server.Algorithms.Graph
     {
         public int SourceId { get; set; }
         public int TargetId { get; set; }
-        public string Type { get; set; } // "flow", "data"
+        public string Type { get; set; }
     }
 
     public class CodeGraph
@@ -30,8 +30,7 @@ namespace AlgoTrace.Server.Algorithms.Graph
         {
             var graph = new CodeGraph();
             var lines = code.Split('\n');
-            
-            // 1. Create Nodes
+
             for (int i = 0; i < lines.Length; i++)
             {
                 var line = lines[i].Trim();
@@ -47,7 +46,6 @@ namespace AlgoTrace.Server.Algorithms.Graph
                 
                 if (includeDataDeps)
                 {
-                    // Simple regex to extract potential variable names
                     var matches = Regex.Matches(line, @"\b[a-zA-Z_][a-zA-Z0-9_]*\b");
                     foreach (Match m in matches) node.Variables.Add(m.Value);
                 }
@@ -55,14 +53,11 @@ namespace AlgoTrace.Server.Algorithms.Graph
                 graph.Nodes.Add(node);
             }
 
-            // 2. Create Control Flow Edges (Simplified sequential + basic branching logic)
             for (int i = 0; i < graph.Nodes.Count - 1; i++)
             {
-                // Sequential flow
                 graph.Edges.Add(new GraphEdge { SourceId = graph.Nodes[i].Id, TargetId = graph.Nodes[i + 1].Id, Type = "flow" });
             }
 
-            // 3. Create Data Dependency Edges (Simplified)
             if (includeDataDeps)
             {
                 for (int i = 0; i < graph.Nodes.Count; i++)

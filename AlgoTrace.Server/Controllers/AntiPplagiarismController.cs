@@ -1,19 +1,18 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using AlgoTrace.Server.Services;
 using AlgoTrace.Server.Interfaces;
-using AlgoTrace.Server.Models.DTO; 
+using AlgoTrace.Server.Models.DTO;
 
 namespace AlgoTrace.Server.Controllers
 {
     [ApiController]
-    [Route("api/analysis")] // Общий базовый путь для всех видов анализа
+    [Route("api/analysis")]
     public class AnalysisController : ControllerBase
     {
         private readonly ITextAnalysisService _textService;
         private readonly IGraphAnalysisService _graphService;
-        private readonly IMetricAnalysisService _metricService; // Добавлен новый сервис
+        private readonly IMetricAnalysisService _metricService;
 
-        // Внедряем все три сервиса через зависимости
         public AnalysisController(
             ITextAnalysisService textService,
             IGraphAnalysisService graphService,
@@ -24,7 +23,6 @@ namespace AlgoTrace.Server.Controllers
             _metricService = metricService;
         }
 
-        // Итоговый маршрут: POST api/analysis/text/compare
         [HttpPost("text/compare")]
         public IActionResult CompareText([FromBody] TextCompareRequest request)
         {
@@ -37,7 +35,6 @@ namespace AlgoTrace.Server.Controllers
             return Ok(result);
         }
 
-        // Итоговый маршрут: POST api/analysis/graph/compare
         [HttpPost("graph/compare")]
         public IActionResult CompareGraph([FromBody] GraphAnalysisRequest request)
         {
@@ -45,7 +42,6 @@ namespace AlgoTrace.Server.Controllers
             return Ok(result);
         }
 
-        // Итоговый маршрут: POST api/analysis/metric/compare
         [HttpPost("metric/compare")]
         public IActionResult CompareMetric([FromBody] MetricAnalysisRequest request)
         {
@@ -54,7 +50,6 @@ namespace AlgoTrace.Server.Controllers
         }
     }
 
-    // DTO класс (напоминаю, что в идеале его стоит вынести в отдельный файл)
     public class TextCompareRequest
     {
         public string SourceCode { get; set; } = "";

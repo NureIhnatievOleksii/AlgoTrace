@@ -30,12 +30,12 @@ namespace AlgoTrace.Server.Services
                         continue;
 
                     var matches = algo.Execute(
-                        fileA.Content, 
-                        fileB.Content, 
-                        request.AnalysisConfig?.Parameters, 
+                        fileA.Content,
+                        fileB.Content,
+                        request.AnalysisConfig?.Parameters,
                         out double score
                     );
-                    
+
                     allMatches.AddRange(matches);
                     totalScore += score;
                     algoCount++;

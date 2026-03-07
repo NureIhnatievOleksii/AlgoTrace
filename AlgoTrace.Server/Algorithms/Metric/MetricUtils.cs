@@ -8,7 +8,7 @@ namespace AlgoTrace.Server.Algorithms.Metric
         public int DistinctOperands { get; set; }
         public int TotalOperators { get; set; }
         public int TotalOperands { get; set; }
-        
+
         public double Vocabulary => DistinctOperators + DistinctOperands;
         public double Length => TotalOperators + TotalOperands;
         public double Volume => Length * (Vocabulary > 0 ? Math.Log2(Vocabulary) : 0);
@@ -18,7 +18,6 @@ namespace AlgoTrace.Server.Algorithms.Metric
 
     public static class MetricUtils
     {
-        // Simplified Python keywords and operators
         private static readonly HashSet<string> Operators = new()
         {
             "+", "-", "*", "/", "%", "**", "//", "=", "+=", "-=", "*=", "/=",
@@ -30,17 +29,14 @@ namespace AlgoTrace.Server.Algorithms.Metric
 
         public static int CalculateMcCabeComplexity(string code)
         {
-            // Base complexity is 1
             int complexity = 1;
             
-            // Keywords that increase complexity (branching)
             var branchingPatterns = new[]
             {
                 @"\bif\b", @"\belif\b", @"\bfor\b", @"\bwhile\b", 
                 @"\bexcept\b", @"\bwith\b", @"\bassert\b"
             };
 
-            // Boolean operators that imply branching
             var boolOperators = new[] { @"\band\b", @"\bor\b" };
 
             foreach (var pattern in branchingPatterns.Concat(boolOperators))
@@ -57,8 +53,6 @@ namespace AlgoTrace.Server.Algorithms.Metric
             var operatorCounts = new Dictionary<string, int>();
             var operandCounts = new Dictionary<string, int>();
 
-            // Tokenize roughly by splitting on whitespace and common delimiters
-            // This is a heuristic approach
             var tokens = Regex.Split(code, @"(\s+|[(){}\[\],:;+\-*/%&|^!=<>])")
                               .Where(t => !string.IsNullOrWhiteSpace(t))
                               .ToList();
@@ -72,11 +66,8 @@ namespace AlgoTrace.Server.Algorithms.Metric
                 }
                 else
                 {
-                    // Assume it's an operand (identifier or literal)
-                    // Filter out empty strings or pure comments if any slipped through
                     if (token.Length > 0 && !token.StartsWith("#"))
                     {
-                        // Treat string literals as operands
                         if (token.StartsWith("\"") || token.StartsWith("'"))
                         {
                              if (!operandCounts.ContainsKey("LITERAL_STRING")) operandCounts["LITERAL_STRING"] = 0;

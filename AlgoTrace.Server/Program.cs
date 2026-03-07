@@ -28,13 +28,11 @@ builder.Services.AddScoped<ITextAlgorithm, LevenshteinAlgorithm>();
 builder.Services.AddScoped<ITextAlgorithm, NgramAlgorithm>();
 builder.Services.AddScoped<ITextAnalysisService, TextAnalysisService>();
 
-// Graph Analysis Services
 builder.Services.AddScoped<IGraphAlgorithm, ControlFlowGraphAlgorithm>();
 builder.Services.AddScoped<IGraphAlgorithm, ProgramDependenceGraphAlgorithm>();
 builder.Services.AddScoped<IGraphAlgorithm, SubgraphIsomorphismAlgorithm>();
 builder.Services.AddScoped<IGraphAnalysisService, GraphAnalysisService>();
 
-// Metric Analysis Services
 builder.Services.AddScoped<IMetricAlgorithm, HalsteadMetricsAlgorithm>();
 builder.Services.AddScoped<IMetricAlgorithm, McCabeComplexityAlgorithm>();
 builder.Services.AddScoped<IMetricAnalysisService, MetricAnalysisService>();

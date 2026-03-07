@@ -9,15 +9,12 @@ namespace AlgoTrace.Server.Algorithms.Graph
 
         public List<DetailedMatch> Execute(string sourceCode, string targetCode, Dictionary<string, object> parameters, out double similarityScore)
         {
-            // Build graphs with Data Dependencies enabled
             var graphA = GraphUtils.BuildGraph(sourceCode, includeDataDeps: true);
             var graphB = GraphUtils.BuildGraph(targetCode, includeDataDeps: true);
 
             var matches = new List<DetailedMatch>();
             int edgeMatches = 0;
 
-            // Compare Data Edges
-            // A match occurs if two edges connect similar types of nodes in both graphs
             foreach (var edgeA in graphA.Edges.Where(e => e.Type == "data"))
             {
                 var srcA = graphA.Nodes.FirstOrDefault(n => n.Id == edgeA.SourceId);
@@ -41,7 +38,7 @@ namespace AlgoTrace.Server.Algorithms.Graph
                                 RightLines = new List<int> { srcB.LineIndex + 1, tgtB.LineIndex + 1 },
                                 Severity = "high"
                             });
-                            break; // Count unique edge mapping roughly
+                            break;
                         }
                     }
                 }

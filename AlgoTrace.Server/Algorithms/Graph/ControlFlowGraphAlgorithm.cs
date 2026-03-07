@@ -4,7 +4,7 @@ namespace AlgoTrace.Server.Algorithms.Graph
 {
     public class ControlFlowGraphAlgorithm : IGraphAlgorithm
     {
-        public string Key => "cfg"; // Matches "methods" in config
+        public string Key => "cfg"; 
         public string Name => "Control Flow Graph Comparison";
 
         public List<DetailedMatch> Execute(string sourceCode, string targetCode, Dictionary<string, object> parameters, out double similarityScore)
@@ -15,8 +15,6 @@ namespace AlgoTrace.Server.Algorithms.Graph
             var matches = new List<DetailedMatch>();
             int matchCount = 0;
 
-            // Simplified CFG comparison: Match nodes by type and relative position
-            // In a real scenario, this would use graph edit distance or kernel methods
             int minLen = Math.Min(graphA.Nodes.Count, graphB.Nodes.Count);
             
             for (int i = 0; i < minLen; i++)
@@ -24,11 +22,9 @@ namespace AlgoTrace.Server.Algorithms.Graph
                 var nodeA = graphA.Nodes[i];
                 var nodeB = graphB.Nodes[i];
 
-                // Check if structure (Control flow type) matches
                 if (nodeA.Type == nodeB.Type)
                 {
                     matchCount++;
-                    // If content is also similar, it's a strong match
                     if (nodeA.Content == nodeB.Content)
                     {
                         matches.Add(new DetailedMatch

@@ -13,15 +13,12 @@ namespace AlgoTrace.Server.Algorithms.Graph
             var graphB = GraphUtils.BuildGraph(targetCode);
 
             var matches = new List<DetailedMatch>();
-            
-            // Heuristic: Check if the sequence of node types in A exists in B
-            // This simulates finding if Graph A is embedded in Graph B
-            
+
             var typesA = graphA.Nodes.Select(n => n.Type).ToList();
             var typesB = graphB.Nodes.Select(n => n.Type).ToList();
 
             int matchedNodes = 0;
-            
+
             for (int i = 0; i <= typesB.Count - typesA.Count; i++)
             {
                 bool isSubGraph = true;
@@ -38,7 +35,7 @@ namespace AlgoTrace.Server.Algorithms.Graph
                 {
                     matchedNodes = typesA.Count;
                     similarityScore = 100.0;
-                    return matches; // Found exact subgraph structure
+                    return matches;
                 }
             }
             similarityScore = 0.0;
