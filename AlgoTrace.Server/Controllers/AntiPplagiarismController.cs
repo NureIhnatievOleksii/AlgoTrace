@@ -1,12 +1,12 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using AlgoTrace.Server.Interfaces;
+using AlgoTrace.Server.Models.DTO;
 using AlgoTrace.Server.Services;
-using AlgoTrace.Server.Interfaces;
-using AlgoTrace.Server.Models.DTO; 
+using Microsoft.AspNetCore.Mvc;
 
 namespace AlgoTrace.Server.Controllers
 {
     [ApiController]
-    [Route("api/analysis")] 
+    [Route("api/analysis")]
     public class AnalysisController : ControllerBase
     {
         private readonly ITextAnalysisService _textService;
@@ -16,7 +16,8 @@ namespace AlgoTrace.Server.Controllers
         public AnalysisController(
             ITextAnalysisService textService,
             IGraphAnalysisService graphService,
-            IMetricAnalysisService metricService)
+            IMetricAnalysisService metricService
+        )
         {
             _textService = textService;
             _graphService = graphService;

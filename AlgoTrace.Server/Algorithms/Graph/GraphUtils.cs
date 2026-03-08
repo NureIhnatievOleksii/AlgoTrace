@@ -34,20 +34,22 @@ namespace AlgoTrace.Server.Algorithms.Graph
             for (int i = 0; i < lines.Length; i++)
             {
                 var line = lines[i].Trim();
-                if (string.IsNullOrWhiteSpace(line) || line.StartsWith("#")) continue;
+                if (string.IsNullOrWhiteSpace(line) || line.StartsWith("#"))
+                    continue;
 
                 var node = new GraphNode
                 {
                     Id = i,
                     LineIndex = i,
                     Content = line,
-                    Type = GetNodeType(line)
+                    Type = GetNodeType(line),
                 };
-                
+
                 if (includeDataDeps)
                 {
                     var matches = Regex.Matches(line, @"\b[a-zA-Z_][a-zA-Z0-9_]*\b");
-                    foreach (Match m in matches) node.Variables.Add(m.Value);
+                    foreach (Match m in matches)
+                        node.Variables.Add(m.Value);
                 }
 
                 graph.Nodes.Add(node);
@@ -55,7 +57,14 @@ namespace AlgoTrace.Server.Algorithms.Graph
 
             for (int i = 0; i < graph.Nodes.Count - 1; i++)
             {
-                graph.Edges.Add(new GraphEdge { SourceId = graph.Nodes[i].Id, TargetId = graph.Nodes[i + 1].Id, Type = "flow" });
+                graph.Edges.Add(
+                    new GraphEdge
+                    {
+                        SourceId = graph.Nodes[i].Id,
+                        TargetId = graph.Nodes[i + 1].Id,
+                        Type = "flow",
+                    }
+                );
             }
 
             if (includeDataDeps)
@@ -66,7 +75,14 @@ namespace AlgoTrace.Server.Algorithms.Graph
                     {
                         if (graph.Nodes[i].Variables.Overlaps(graph.Nodes[j].Variables))
                         {
-                            graph.Edges.Add(new GraphEdge { SourceId = graph.Nodes[i].Id, TargetId = graph.Nodes[j].Id, Type = "data" });
+                            graph.Edges.Add(
+                                new GraphEdge
+                                {
+                                    SourceId = graph.Nodes[i].Id,
+                                    TargetId = graph.Nodes[j].Id,
+                                    Type = "data",
+                                }
+                            );
                         }
                     }
                 }
@@ -76,7 +92,9 @@ namespace AlgoTrace.Server.Algorithms.Graph
         }
 
         private static string GetNodeType(string line) =>
-            line.StartsWith("if ") || line.StartsWith("while ") || line.StartsWith("for ") ? "control" :
-            line.StartsWith("def ") ? "def" : "statement";
+            line.StartsWith("if ") || line.StartsWith("while ") || line.StartsWith("for ")
+                ? "control"
+            : line.StartsWith("def ") ? "def"
+            : "statement";
     }
 }

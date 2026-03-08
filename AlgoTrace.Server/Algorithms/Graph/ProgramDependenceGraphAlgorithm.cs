@@ -7,7 +7,12 @@ namespace AlgoTrace.Server.Algorithms.Graph
         public string Key => "pdg";
         public string Name => "Program Dependence Graph";
 
-        public List<DetailedMatch> Execute(string sourceCode, string targetCode, Dictionary<string, object> parameters, out double similarityScore)
+        public List<DetailedMatch> Execute(
+            string sourceCode,
+            string targetCode,
+            Dictionary<string, object> parameters,
+            out double similarityScore
+        )
         {
             var graphA = GraphUtils.BuildGraph(sourceCode, includeDataDeps: true);
             var graphB = GraphUtils.BuildGraph(targetCode, includeDataDeps: true);
@@ -30,20 +35,33 @@ namespace AlgoTrace.Server.Algorithms.Graph
                         if (srcA.Type == srcB.Type && tgtA.Type == tgtB.Type)
                         {
                             edgeMatches++;
-                            matches.Add(new DetailedMatch
-                            {
-                                Id = edgeMatches + 5000,
-                                Type = "Data Dependency Match",
-                                LeftLines = new List<int> { srcA.LineIndex + 1, tgtA.LineIndex + 1 },
-                                RightLines = new List<int> { srcB.LineIndex + 1, tgtB.LineIndex + 1 },
-                                Severity = "high"
-                            });
+                            matches.Add(
+                                new DetailedMatch
+                                {
+                                    Id = edgeMatches + 5000,
+                                    Type = "Data Dependency Match",
+                                    LeftLines = new List<int>
+                                    {
+                                        srcA.LineIndex + 1,
+                                        tgtA.LineIndex + 1,
+                                    },
+                                    RightLines = new List<int>
+                                    {
+                                        srcB.LineIndex + 1,
+                                        tgtB.LineIndex + 1,
+                                    },
+                                    Severity = "high",
+                                }
+                            );
                             break;
                         }
                     }
                 }
             }
-            similarityScore = graphA.Edges.Count > 0 ? Math.Min(100, (double)edgeMatches / graphA.Edges.Count * 100) : 0;
+            similarityScore =
+                graphA.Edges.Count > 0
+                    ? Math.Min(100, (double)edgeMatches / graphA.Edges.Count * 100)
+                    : 0;
             return matches;
         }
     }

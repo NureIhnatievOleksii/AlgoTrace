@@ -7,7 +7,12 @@ namespace AlgoTrace.Server.Algorithms.Graph
         public string Key => "subgraph_isomorphism";
         public string Name => "Subgraph Isomorphism Search";
 
-        public List<DetailedMatch> Execute(string sourceCode, string targetCode, Dictionary<string, object> parameters, out double similarityScore)
+        public List<DetailedMatch> Execute(
+            string sourceCode,
+            string targetCode,
+            Dictionary<string, object> parameters,
+            out double similarityScore
+        )
         {
             var graphA = GraphUtils.BuildGraph(sourceCode);
             var graphB = GraphUtils.BuildGraph(targetCode);

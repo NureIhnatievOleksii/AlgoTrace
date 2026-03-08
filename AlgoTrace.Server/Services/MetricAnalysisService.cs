@@ -50,19 +50,22 @@ namespace AlgoTrace.Server.Services
                 {
                     OverallScore = (int)averageScore,
                     Mode = "Metrics-Based Analysis",
-                    Date = DateTime.Now.ToString("dd.MM.yyyy")
+                    Date = DateTime.Now.ToString("dd.MM.yyyy"),
                 },
-                SubmissionTree = new List<NodeDto> {
-                    new NodeDto {
+                SubmissionTree = new List<NodeDto>
+                {
+                    new NodeDto
+                    {
                         Name = fileA?.Filename ?? "unknown",
                         Type = "file",
                         Score = (int)averageScore,
-                        DetailedMatches = new Dictionary<string, List<DetailedMatch>> {
-                            { fileB?.Filename ?? "unknown", allMatches }
-                        }
-                    }
+                        DetailedMatches = new Dictionary<string, List<DetailedMatch>>
+                        {
+                            { fileB?.Filename ?? "unknown", allMatches },
+                        },
+                    },
                 },
-                ReferenceTree = new List<NodeDto>()
+                ReferenceTree = new List<NodeDto>(),
             };
         }
     }

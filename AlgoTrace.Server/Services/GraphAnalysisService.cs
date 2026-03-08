@@ -35,7 +35,8 @@ namespace AlgoTrace.Server.Services
                     );
 
                     allMatches.AddRange(matches);
-                    if (score > maxScore) maxScore = score;
+                    if (score > maxScore)
+                        maxScore = score;
                 }
             }
 
@@ -45,20 +46,22 @@ namespace AlgoTrace.Server.Services
                 {
                     OverallScore = (int)maxScore,
                     Mode = "Graph-Based Analysis",
-                    Date = DateTime.Now.ToString("dd.MM.yyyy")
+                    Date = DateTime.Now.ToString("dd.MM.yyyy"),
                 },
-                SubmissionTree = new List<NodeDto> {
-                    new NodeDto {
+                SubmissionTree = new List<NodeDto>
+                {
+                    new NodeDto
+                    {
                         Name = fileA?.Filename ?? "unknown",
                         Type = "file",
                         Score = (int)maxScore,
                         DetailedMatches = new Dictionary<string, List<DetailedMatch>>
                         {
-                            { fileB?.Filename ?? "unknown", allMatches }
-                        }
-                    }
+                            { fileB?.Filename ?? "unknown", allMatches },
+                        },
+                    },
                 },
-                ReferenceTree = new List<NodeDto>() 
+                ReferenceTree = new List<NodeDto>(),
             };
         }
     }

@@ -4,6 +4,11 @@ namespace AlgoTrace.Server.Models.DTO
     {
         string Key { get; }
         string Name { get; }
-        List<DetailedMatch> Execute(string sourceCode, string targetCode, Dictionary<string, object> parameters, out double similarityScore);
+        List<DetailedMatch> Execute(
+            string sourceCode,
+            string targetCode,
+            Dictionary<string, object> parameters,
+            out double similarityScore
+        );
     }
 }
