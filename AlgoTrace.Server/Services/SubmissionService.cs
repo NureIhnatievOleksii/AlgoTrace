@@ -1,19 +1,23 @@
-﻿
-using AlgoTrace.Server.Interfaces;
+﻿using AlgoTrace.Server.Interfaces;
 using AlgoTrace.Server.Models.DTO;
 
 namespace AlgoTrace.Server.Services
 {
     public class SubmissionService : ISubmissionService
     {
-        public async Task<SubmissionAnalysisResponse> ProcessSubmissionAsync(Stream fileStream, string fileName)
+        public async Task<SubmissionAnalysisResponse> ProcessSubmissionAsync(
+            Stream fileStream,
+            string fileName
+        )
         {
             var extension = Path.GetExtension(fileName).ToLowerInvariant();
             var language = GetLanguageFromExtension(extension);
 
             if (language == "unknown")
             {
-                throw new ArgumentException($"Unsupported file type: {extension}. Please upload a valid code file.");
+                throw new ArgumentException(
+                    $"Unsupported file type: {extension}. Please upload a valid code file."
+                );
             }
 
             string content;
@@ -22,7 +26,6 @@ namespace AlgoTrace.Server.Services
                 content = await reader.ReadToEndAsync();
             }
 
-            // Формируем ответ согласно требуемой структуре
             return new SubmissionAnalysisResponse
             {
                 Language = language,
@@ -30,13 +33,9 @@ namespace AlgoTrace.Server.Services
                 {
                     Files = new List<CodeFile>
                     {
-                        new CodeFile
-                        {
-                            Filename = fileName,
-                            Content = content
-                        }
-                    }
-                }
+                        new CodeFile { Filename = fileName, Content = content },
+                    },
+                },
             };
         }
 
@@ -56,7 +55,7 @@ namespace AlgoTrace.Server.Services
                 ".php" => "php",
                 ".html" => "html",
                 ".css" => "css",
-                _ => "unknown"
+                _ => "unknown",
             };
         }
     }

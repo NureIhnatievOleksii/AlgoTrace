@@ -1,7 +1,7 @@
 ﻿using AlgoTrace.Server.Interfaces;
-using Microsoft.AspNetCore.Mvc;
 using AlgoTrace.Server.Services;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 
 namespace AlgoTrace.Server.Controllers
 {
