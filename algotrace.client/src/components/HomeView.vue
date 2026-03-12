@@ -2,7 +2,7 @@
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { authService, authState } from '../services/auth.service';
-import { analysisService, analysisState, type AnalysisPayload } from '../services/analysis.service';
+import { analysisService, analysisState, type AnalysisPayload, type FileContent } from '../services/analysis.service';
 
 const router = useRouter();
 
@@ -24,7 +24,6 @@ const analysisConfig = [
   {
     id: 'text',
     name: 'Text Analysis',
-    endpoint: '/api/analysis/text/compare',
     methods: [
       { value: 'levenshtein', label: 'Levenshtein Distance' },
       { value: 'line_matching', label: 'Line Matching' },
@@ -35,7 +34,6 @@ const analysisConfig = [
   {
     id: 'token',
     name: 'Token Analysis',
-    endpoint: '/api/analysis/token/compare',
     methods: [
       { value: 'jaccard_token', label: 'Jaccard Token' },
       { value: 'winnowing', label: 'Winnowing' }
@@ -44,7 +42,6 @@ const analysisConfig = [
   {
     id: 'tree',
     name: 'Tree (AST) Analysis',
-    endpoint: '/api/analysis/tree/compare',
     methods: [
       { value: 'ast_hashing', label: 'AST Hashing' },
       { value: 'ast_compare', label: 'AST Compare' },
@@ -54,7 +51,6 @@ const analysisConfig = [
   {
     id: 'graph',
     name: 'Graph (CFG/PDG)',
-    endpoint: '/api/analysis/graph/compare',
     methods: [
       { value: 'cfg', label: 'Control Flow Graph (CFG)' },
       { value: 'pdg', label: 'Program Dependence Graph (PDG)' },
@@ -64,7 +60,6 @@ const analysisConfig = [
   {
     id: 'metric',
     name: 'Software Metrics',
-    endpoint: '/api/analysis/metric/compare',
     methods: [
       { value: 'halstead', label: 'Halstead Metrics' },
       { value: 'mccabe', label: 'McCabe Complexity' }
@@ -142,7 +137,10 @@ const startComparison = async () => {
   analysisState.currentReport = null;
 
   try {
-    let payloadBase: Partial<AnalysisPayload> = {};
+    // Тимчасові змінні для даних submission
+    let submissionAData: { files: FileContent[] } | undefined;
+    let submissionBData: { files: FileContent[] } | undefined;
+    let language = 'python';
 
     // 1. Подготовка данных (Upload файлов или текст)
     if (inputMode.value === 'file') {
@@ -152,67 +150,56 @@ const startComparison = async () => {
         analysisService.uploadFile(file2.value!)
       ]);
 
-      // Берем язык из первого файла, если он есть
-      payloadBase = {
-        language: res1.data.language || 'python',
-        submissionA: res1.data.submission,
-        submissionB: res2.data.submission
-      };
+      language = res1.data.language || 'python';
+      submissionAData = res1.data.submission;
+      submissionBData = res2.data.submission;
     } else {
       // Текстовый режим
-      payloadBase = {
-        language: selectedLanguage.value,
-        submissionA: { files: [{ filename: "submission.txt", content: code1.value }] },
-        submissionB: { files: [{ filename: "reference.txt", content: code2.value }] }
-      };
+      language = selectedLanguage.value;
+      submissionAData = { files: [{ filename: "submission.txt", content: code1.value }] };
+      submissionBData = { files: [{ filename: "reference.txt", content: code2.value }] };
     }
 
-    // 2. Отправка запросов по каждой категории
-        const requests: Promise<unknown>[] = [];
+    // 2. Формування execute_categories
+    const executeCategories: Record<string, string[]> = {};
 
-    for (const cat of analysisConfig) {
-      const methods = selectedMethods.value[cat.id];
+    // Мапінг id категорій з UI на ключі API
+    const categoryMap: Record<string, string> = {
+      'text': 'text_based',
+      'token': 'token_based',
+      'tree': 'tree_based',
+      'graph': 'graph_based',
+      'metric': 'metrics_based'
+    };
+
+    for (const [catId, methods] of Object.entries(selectedMethods.value)) {
       if (methods && methods.length > 0) {
-        const payload: AnalysisPayload = {
-          language: payloadBase.language!,
-          submissionA: payloadBase.submissionA!,
-          submissionB: payloadBase.submissionB!,
-          analysisConfig: {
-            methods: methods,
-            parameters: { ignore_comments: true, ignore_whitespace: true }
-          }
-        };
-        requests.push(analysisService.analyze(cat.endpoint, payload));
-      }
-    }
-
-    const responses = await Promise.all(requests);
-
-    // 3. Агрегация результатов
-    if (responses.length > 0) {
-      // Берем первый отчет за основу
-          const mergedReport = (responses[0] as { data: { submission_tree: Record<string, unknown>[] } }).data;
-
-      // Если есть другие отчеты, добавляем их detailed_matches в основу
-      for (let i = 1; i < responses.length; i++) {
-            const otherReport = (responses[i] as { data: { submission_tree: Record<string, unknown>[] } }).data;
-
-        // Простой мердж submission_tree (предполагаем одинаковую структуру файлов)
-        if (mergedReport.submission_tree && otherReport.submission_tree) {
-             // Рекурсивный мердж matches мог бы быть сложнее,
-             // но пока просто добавим данные, если структура совпадает.
-             // Для MVP просто считаем, что файлы одни и те же.
-             // Тут упрощенная логика: проходим по файлам верхнего уровня
-                 mergedReport.submission_tree.forEach((node: Record<string, unknown>, idx: number) => {
-                const otherNode = otherReport.submission_tree[idx];
-                if (node.detailed_matches && otherNode?.detailed_matches) {
-                       Object.assign(node.detailed_matches as object, otherNode.detailed_matches);
-                }
-             });
+        const apiCategoryKey = categoryMap[catId];
+        if (apiCategoryKey) {
+          executeCategories[apiCategoryKey] = methods;
         }
       }
+    }
 
-      analysisState.currentReport = mergedReport;
+    // 3. Відправка єдиного запиту
+    const payload: AnalysisPayload = {
+      language: language,
+      submission_a: submissionAData!,
+      submission_b: submissionBData!,
+      analysis_config: {
+        parameters: {
+          ignore_comments: true,
+          ignore_whitespace: true
+        },
+        execute_categories: executeCategories
+      }
+    };
+
+    const response = await analysisService.analyze('/api/analysis/unified', payload);
+
+    if (response.data) {
+      // Поки що просто зберігаємо результат як є, без налаштувань response
+      analysisState.currentReport = response.data as Record<string, unknown>;
       router.push('/analyzer');
     }
   } catch (e) {

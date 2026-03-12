@@ -8,18 +8,18 @@ export interface FileContent {
 
 export interface AnalysisPayload {
   language: string;
-  submissionA: {
+  submission_a: {
     files: FileContent[];
   };
-  submissionB: {
+  submission_b: {
     files: FileContent[];
   };
-  analysisConfig: {
-    methods: string[];
+  analysis_config: {
     parameters: {
       ignore_comments: boolean;
       ignore_whitespace: boolean;
     };
+    execute_categories: Record<string, string[]>;
   };
 }
 
