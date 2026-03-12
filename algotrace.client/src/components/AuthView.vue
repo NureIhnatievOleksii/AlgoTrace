@@ -43,7 +43,7 @@ const handleSubmit = async () => {
       });
       router.push('/');
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error(err);
     error.value = isLogin.value
       ? 'Невірний логін або пароль.'

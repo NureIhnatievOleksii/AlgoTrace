@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { authService, authState } from '../services/auth.service';
 import { analysisService, analysisState, type AnalysisPayload } from '../services/analysis.service';
@@ -168,15 +168,15 @@ const startComparison = async () => {
     }
 
     // 2. Отправка запросов по каждой категории
-    const requests: Promise<any>[] = [];
+        const requests: Promise<unknown>[] = [];
 
     for (const cat of analysisConfig) {
       const methods = selectedMethods.value[cat.id];
       if (methods && methods.length > 0) {
         const payload: AnalysisPayload = {
           language: payloadBase.language!,
-          submissionA: payloadBase.submissionA as any,
-          submissionB: payloadBase.submissionB as any,
+          submissionA: payloadBase.submissionA!,
+          submissionB: payloadBase.submissionB!,
           analysisConfig: {
             methods: methods,
             parameters: { ignore_comments: true, ignore_whitespace: true }
@@ -191,11 +191,11 @@ const startComparison = async () => {
     // 3. Агрегация результатов
     if (responses.length > 0) {
       // Берем первый отчет за основу
-      const mergedReport = responses[0].data;
+          const mergedReport = (responses[0] as { data: { submission_tree: Record<string, unknown>[] } }).data;
 
       // Если есть другие отчеты, добавляем их detailed_matches в основу
       for (let i = 1; i < responses.length; i++) {
-        const otherReport = responses[i].data;
+            const otherReport = (responses[i] as { data: { submission_tree: Record<string, unknown>[] } }).data;
 
         // Простой мердж submission_tree (предполагаем одинаковую структуру файлов)
         if (mergedReport.submission_tree && otherReport.submission_tree) {
@@ -203,10 +203,10 @@ const startComparison = async () => {
              // но пока просто добавим данные, если структура совпадает.
              // Для MVP просто считаем, что файлы одни и те же.
              // Тут упрощенная логика: проходим по файлам верхнего уровня
-             mergedReport.submission_tree.forEach((node: any, idx: number) => {
+                 mergedReport.submission_tree.forEach((node: Record<string, unknown>, idx: number) => {
                 const otherNode = otherReport.submission_tree[idx];
                 if (node.detailed_matches && otherNode?.detailed_matches) {
-                   Object.assign(node.detailed_matches, otherNode.detailed_matches);
+                       Object.assign(node.detailed_matches as object, otherNode.detailed_matches);
                 }
              });
         }
@@ -452,8 +452,8 @@ const resendEmail = async () => {
                             type="checkbox"
                             :id="'cat-' + cat.id"
                             :checked="selectedMethods[cat.id]?.length === cat.methods.length"
-                            @change="(e: any) => {
-                              if(e.target.checked) selectedMethods[cat.id] = cat.methods.map(m => m.value);
+                            @change="(e: Event) => {
+                              if((e.target as HTMLInputElement).checked) selectedMethods[cat.id] = cat.methods.map(m => m.value);
                               else delete selectedMethods[cat.id];
                             }"
                           >

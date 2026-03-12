@@ -25,7 +25,7 @@ export interface AnalysisPayload {
 
 // Глобальное состояние для хранения результатов анализа
 export const analysisState = reactive({
-  currentReport: null as any | null
+  currentReport: null as Record<string, unknown> | null
 });
 
 export const analysisService = {
