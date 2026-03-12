@@ -1,4 +1,4 @@
-﻿﻿using AlgoTrace.Server.Models.DTO;
+﻿using AlgoTrace.Server.Models.DTO;
 
 namespace AlgoTrace.Server.Interfaces
 {

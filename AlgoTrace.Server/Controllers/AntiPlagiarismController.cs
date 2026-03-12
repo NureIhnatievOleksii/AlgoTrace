@@ -1,4 +1,4 @@
-﻿﻿using AlgoTrace.Server.Interfaces;
+﻿using AlgoTrace.Server.Interfaces;
 using AlgoTrace.Server.Models.DTO;
 using Microsoft.AspNetCore.Mvc;
 

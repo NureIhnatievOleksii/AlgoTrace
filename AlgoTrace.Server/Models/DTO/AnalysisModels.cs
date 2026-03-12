@@ -1,6 +1,6 @@
-﻿﻿using Microsoft.AspNetCore.Http;
+﻿using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using System.Text.Json.Serialization;
 
 namespace AlgoTrace.Server.Models.DTO
 {
@@ -199,12 +199,19 @@ namespace AlgoTrace.Server.Models.DTO
 
     public class CodeLocation
     {
-        [JsonPropertyName("start_line")] public int StartLine { get; set; }
-        [JsonPropertyName("start_column")] public int StartColumn { get; set; }
-        [JsonPropertyName("end_line")] public int EndLine { get; set; }
-        [JsonPropertyName("end_column")] public int EndColumn { get; set; }
+        [JsonPropertyName("start_line")]
+        public int StartLine { get; set; }
+
+        [JsonPropertyName("start_column")]
+        public int StartColumn { get; set; }
+
+        [JsonPropertyName("end_line")]
+        public int EndLine { get; set; }
+
+        [JsonPropertyName("end_column")]
+        public int EndColumn { get; set; }
     }
 
-    // For graph/tree we can use generic objects or Dictionary<string,object> 
+    // For graph/tree we can use generic objects or Dictionary<string,object>
     // as the visualization structure can be complex.
 }

@@ -16,7 +16,8 @@ namespace AlgoTrace.Server.Algorithms.Tree
             var allNodesA = treeA.Flatten().ToList();
             var allNodesB = treeB.Flatten().ToList();
 
-            if (!allNodesA.Any() || !allNodesB.Any()) return 0;
+            if (!allNodesA.Any() || !allNodesB.Any())
+                return 0;
 
             var matchedNodesB = new HashSet<UniversalNode>();
             double totalNodes = Math.Max(allNodesA.Count(), allNodesB.Count());
@@ -25,11 +26,13 @@ namespace AlgoTrace.Server.Algorithms.Tree
             foreach (var nodeA in allNodesA)
             {
                 // Skip trivial nodes for matching, but they count towards total
-                if (nodeA.Children.Count == 0 && string.IsNullOrWhiteSpace(nodeA.Value)) continue;
+                if (nodeA.Children.Count == 0 && string.IsNullOrWhiteSpace(nodeA.Value))
+                    continue;
 
                 foreach (var nodeB in allNodesB)
                 {
-                    if (matchedNodesB.Contains(nodeB)) continue;
+                    if (matchedNodesB.Contains(nodeB))
+                        continue;
 
                     if (AreNodesStructurallyEqual(nodeA, nodeB))
                     {
@@ -37,15 +40,18 @@ namespace AlgoTrace.Server.Algorithms.Tree
                         var subtreeNodesB = nodeB.Flatten().ToList();
 
                         // Add evidence for this match
-                        evidence.MatchedSubtrees.Add(new MatchedSubtree
-                        {
-                            NodeType = nodeA.Type,
-                            NodesA = new List<MatchedNodeInfo> { CreateNodeInfo(nodeA, "a") },
-                            NodesB = new List<MatchedNodeInfo> { CreateNodeInfo(nodeB, "b") }
-                        });
+                        evidence.MatchedSubtrees.Add(
+                            new MatchedSubtree
+                            {
+                                NodeType = nodeA.Type,
+                                NodesA = new List<MatchedNodeInfo> { CreateNodeInfo(nodeA, "a") },
+                                NodesB = new List<MatchedNodeInfo> { CreateNodeInfo(nodeB, "b") },
+                            }
+                        );
 
                         matchedNodesCount += subtreeNodesA.Count;
-                        foreach (var n in subtreeNodesB) matchedNodesB.Add(n);
+                        foreach (var n in subtreeNodesB)
+                            matchedNodesB.Add(n);
 
                         // Once a node in B is matched, don't match it again
                         break;
@@ -63,18 +69,22 @@ namespace AlgoTrace.Server.Algorithms.Tree
             {
                 Id = $"{submissionPrefix}_{node.GetHashCode()}",
                 Label = node.Type,
-                Children = node.Children.Select(c => $"{submissionPrefix}_{c.GetHashCode()}").ToList(),
-                Location = node.Location ?? new CodeLocation() // Handle null location
+                Children = node
+                    .Children.Select(c => $"{submissionPrefix}_{c.GetHashCode()}")
+                    .ToList(),
+                Location = node.Location ?? new CodeLocation(), // Handle null location
             };
         }
 
         private bool AreNodesStructurallyEqual(UniversalNode a, UniversalNode b)
         {
-            if (a.Type != b.Type || a.Children.Count != b.Children.Count) return false;
+            if (a.Type != b.Type || a.Children.Count != b.Children.Count)
+                return false;
 
             for (int i = 0; i < a.Children.Count; i++)
             {
-                if (!AreNodesStructurallyEqual(a.Children[i], b.Children[i])) return false;
+                if (!AreNodesStructurallyEqual(a.Children[i], b.Children[i]))
+                    return false;
             }
             return true;
         }

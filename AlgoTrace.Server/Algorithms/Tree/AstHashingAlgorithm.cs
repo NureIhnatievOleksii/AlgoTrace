@@ -7,6 +7,7 @@ namespace AlgoTrace.Server.Algorithms.Tree
     public class AstHashingAlgorithm : ITreeAlgorithm
     {
         public string Key => "ast_hashing";
+
         public double Calculate(UniversalNode treeA, UniversalNode treeB, out object outMatches)
         {
             var hashA = GetTreeHash(treeA);
@@ -21,6 +22,7 @@ namespace AlgoTrace.Server.Algorithms.Tree
             }
             return 0;
         }
+
         private int GetTreeHash(UniversalNode node) =>
             HashCode.Combine(node.Type, node.Children.Sum(c => GetTreeHash(c)));
     }

@@ -1,6 +1,6 @@
-﻿using AlgoTrace.Server.Models.DTO;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
+using AlgoTrace.Server.Models.DTO;
 
 namespace AlgoTrace.Server.ParserFactory
 {

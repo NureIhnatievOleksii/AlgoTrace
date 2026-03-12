@@ -139,7 +139,7 @@ export const authService = {
     if (token) {
       try {
         await this.fetchUserInfo();
-      } catch (error) {
+      } catch { // <-- Просто убираем (error)
         console.warn('Token invalid or expired during init');
         this.logout();
       }
