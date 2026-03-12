@@ -26,9 +26,9 @@ namespace AlgoTrace.Server.Models.DTO
 
     public class AnalysisResponse
     {
-        public AnalysisInfo Info { get; set; }
-        public List<NodeDto> SubmissionTree { get; set; }
-        public List<NodeDto> ReferenceTree { get; set; }
+        public AnalysisInfo Info { get; set; } = new();
+        public List<NodeDto> SubmissionTree { get; set; } = new();
+        public List<NodeDto> ReferenceTree { get; set; } = new();
     }
 
     public class AnalysisInfo
@@ -136,7 +136,7 @@ namespace AlgoTrace.Server.Models.DTO
         public string EvidenceType { get; set; } = "";
 
         [JsonPropertyName("evidence")]
-        public object Evidence { get; set; }
+        public object Evidence { get; set; } = new { };
     }
 
     // Specific Evidence Models
@@ -173,7 +173,7 @@ namespace AlgoTrace.Server.Models.DTO
     public class MatchedSubtree
     {
         [JsonPropertyName("node_type")]
-        public string NodeType { get; set; }
+        public string NodeType { get; set; } = "";
 
         [JsonPropertyName("nodes_a")]
         public List<MatchedNodeInfo> NodesA { get; set; } = new();
@@ -185,16 +185,16 @@ namespace AlgoTrace.Server.Models.DTO
     public class MatchedNodeInfo
     {
         [JsonPropertyName("id")]
-        public string Id { get; set; }
+        public string Id { get; set; } = "";
 
         [JsonPropertyName("label")]
-        public string Label { get; set; }
+        public string Label { get; set; } = "";
 
         [JsonPropertyName("children")]
         public List<string> Children { get; set; } = new();
 
         [JsonPropertyName("location")]
-        public CodeLocation Location { get; set; }
+        public CodeLocation Location { get; set; } = new();
     }
 
     public class CodeLocation
