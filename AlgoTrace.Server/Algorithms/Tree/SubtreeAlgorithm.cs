@@ -8,9 +8,10 @@ namespace AlgoTrace.Server.Algorithms.Tree
     {
         public string Key => "subtree_isomorphism";
 
-        public double Calculate(UniversalNode treeA, UniversalNode treeB, out List<DetailedMatch> matches)
+        public double Calculate(UniversalNode treeA, UniversalNode treeB, out object outMatches)
         {
-            matches = new List<DetailedMatch>();
+            var matches = new List<DetailedMatch>();
+            outMatches = matches;
 
             var subtreesA = treeA.Flatten().Where(n => n.Type.Contains("Method") || n.Type.Contains("Function")).ToList();
             var subtreesB = treeB.Flatten().Where(n => n.Type.Contains("Method") || n.Type.Contains("Function")).ToList();
