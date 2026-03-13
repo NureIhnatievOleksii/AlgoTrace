@@ -29,25 +29,21 @@ builder.Services.AddOpenApi();
 builder.Services.AddScoped<ITextAlgorithm, RabinKarpAlgorithm>();
 builder.Services.AddScoped<ITextAlgorithm, LevenshteinAlgorithm>();
 builder.Services.AddScoped<ITextAlgorithm, NgramAlgorithm>();
-builder.Services.AddScoped<ITextAnalysisService, TextAnalysisService>();
 
 builder.Services.AddScoped<ITokenAlgorithm, WinnowingAlgorithm>();
 builder.Services.AddScoped<ITokenAlgorithm, JaccardTokenAlgorithm>();
-builder.Services.AddScoped<ITokenAnalysisService, TokenAnalysisService>();
 
 builder.Services.AddScoped<ITreeAlgorithm, AstStructureAlgorithm>();
 builder.Services.AddScoped<ITreeAlgorithm, SubtreeAlgorithm>();
 builder.Services.AddScoped<ITreeAlgorithm, AstHashingAlgorithm>();
-builder.Services.AddScoped<ITreeAnalysisService, TreeAnalysisService>();
 
 builder.Services.AddScoped<IGraphAlgorithm, ControlFlowGraphAlgorithm>();
 builder.Services.AddScoped<IGraphAlgorithm, ProgramDependenceGraphAlgorithm>();
 builder.Services.AddScoped<IGraphAlgorithm, SubgraphIsomorphismAlgorithm>();
-builder.Services.AddScoped<IGraphAnalysisService, GraphAnalysisService>();
 
 builder.Services.AddScoped<IMetricAlgorithm, HalsteadMetricsAlgorithm>();
 builder.Services.AddScoped<IMetricAlgorithm, McCabeComplexityAlgorithm>();
-builder.Services.AddScoped<IMetricAnalysisService, MetricAnalysisService>();
+
 builder.Services.AddScoped<IUnifiedAnalysisService, UnifiedAnalysisService>();
 
 builder.Services.AddScoped<ISubmissionService, SubmissionService>();

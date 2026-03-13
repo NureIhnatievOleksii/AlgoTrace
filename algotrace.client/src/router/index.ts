@@ -13,13 +13,17 @@ const router = createRouter({
       path: '/auth',
       name: 'auth',
       component: () => import('../components/AuthView.vue')
+    },
+    {
+      path: '/storage',
+      name: 'storage',
+      component: () => import('../components/StorageView.vue'),
+      meta: { requiresAuth: true }
     }
   ]
 });
 
-// Глобальный Guard для защиты роутов
 router.beforeEach(async (to, from, next) => {
-  // Если данные еще грузятся (например, при F5), ждем инициализации
   if (authState.loading) {
     await authService.init();
   }
