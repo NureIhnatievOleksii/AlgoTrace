@@ -250,7 +250,17 @@ const resendEmail = async () => {
               <span class="fw-bold small">{{ authState.user?.email }}</span>
             </a>
             <ul class="dropdown-menu dropdown-menu-end border-0 shadow-lg rounded-3 mt-2">
-              <li><button class="dropdown-item text-danger fw-bold" @click="authService.logout()"><i class="bi bi-box-arrow-right me-2"></i> Вийти</button></li>
+              <li>
+                <router-link to="/storage" class="dropdown-item fw-bold py-2">
+                  <i class="bi bi-folder2-open me-2 text-primary"></i> Мої файли
+                </router-link>
+              </li>
+              <li><hr class="dropdown-divider"></li>
+              <li>
+                <button class="dropdown-item text-danger fw-bold py-2" @click="authService.logout()">
+                  <i class="bi bi-box-arrow-right me-2"></i> Вийти
+                </button>
+              </li>
             </ul>
           </div>
         </div>
