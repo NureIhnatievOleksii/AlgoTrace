@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace AlgoTrace.Server.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260226091559_InitialCreate")]
+    [Migration("20260314122437_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -27,14 +27,12 @@ namespace AlgoTrace.Server.Migrations
 
             modelBuilder.Entity("AlgoTrace.Server.Models.File", b =>
                 {
-                    b.Property<int>("FileId")
+                    b.Property<Guid>("FileId")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+                        .HasColumnType("uniqueidentifier");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("FileId"));
-
-                    b.Property<int>("FolderId")
-                        .HasColumnType("int");
+                    b.Property<Guid?>("FolderId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -44,27 +42,31 @@ namespace AlgoTrace.Server.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
                     b.HasKey("FileId");
 
                     b.HasIndex("FolderId");
+
+                    b.HasIndex("UserId");
 
                     b.ToTable("Files");
                 });
 
             modelBuilder.Entity("AlgoTrace.Server.Models.Folder", b =>
                 {
-                    b.Property<int>("FolderId")
+                    b.Property<Guid>("FolderId")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("FolderId"));
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<int?>("ParentId")
-                        .HasColumnType("int");
+                    b.Property<Guid?>("ParentId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("UserId")
                         .IsRequired()
@@ -281,11 +283,17 @@ namespace AlgoTrace.Server.Migrations
                 {
                     b.HasOne("AlgoTrace.Server.Models.Folder", "Folder")
                         .WithMany("Files")
-                        .HasForeignKey("FolderId")
+                        .HasForeignKey("FolderId");
+
+                    b.HasOne("AlgoTrace.Server.Models.User", "User")
+                        .WithMany("Files")
+                        .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("Folder");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("AlgoTrace.Server.Models.Folder", b =>
@@ -366,6 +374,8 @@ namespace AlgoTrace.Server.Migrations
 
             modelBuilder.Entity("AlgoTrace.Server.Models.User", b =>
                 {
+                    b.Navigation("Files");
+
                     b.Navigation("Folders");
                 });
 #pragma warning restore 612, 618

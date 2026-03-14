@@ -40,7 +40,7 @@ namespace AlgoTrace.Server.Controllers
         }
 
         [HttpGet("folder/{folderId?}")]
-        public async Task<IActionResult> GetFolder(int? folderId)
+        public async Task<IActionResult> GetFolder(Guid? folderId)
         {
             var userId = GetUserId();
 
@@ -51,11 +51,10 @@ namespace AlgoTrace.Server.Controllers
                     .Select(f => new { f.FolderId, f.Name }).ToListAsync();
 
                 var rootFiles = await _context.Files
-                    .Include(f => f.Folder)
-                    .Where(f => f.FolderId == 0 || (f.Folder != null && f.Folder.UserId == userId && f.Folder.ParentId == null))
+                    .Where(f => f.UserId == userId && f.FolderId == null)
                     .Select(f => new { f.FileId, f.Name }).ToListAsync();
 
-                return Ok(new { FolderId = (int?)null, Name = "Мій диск", Folders = rootFolders, Files = rootFiles });
+                return Ok(new { FolderId = (Guid?)null, Name = "Мій диск", Folders = rootFolders, Files = rootFiles });
             }
 
             var folder = await _context.Folders
@@ -80,7 +79,7 @@ namespace AlgoTrace.Server.Controllers
             var newFolder = new Folder
             {
                 Name = model.Name,
-                ParentId = model.ParentId == 0 ? null : model.ParentId,
+                ParentId = model.ParentId,
                 UserId = GetUserId()
             };
             _context.Folders.Add(newFolder);
@@ -89,7 +88,7 @@ namespace AlgoTrace.Server.Controllers
         }
 
         [HttpPut("folder/{id}/rename")]
-        public async Task<IActionResult> RenameFolder(int id, [FromBody] string newName)
+        public async Task<IActionResult> RenameFolder(Guid id, [FromBody] string newName)
         {
             var folder = await _context.Folders.FirstOrDefaultAsync(f => f.FolderId == id && f.UserId == GetUserId());
             if (folder == null) return NotFound();
@@ -99,7 +98,7 @@ namespace AlgoTrace.Server.Controllers
         }
 
         [HttpDelete("folder/{id}")]
-        public async Task<IActionResult> DeleteFolder(int id)
+        public async Task<IActionResult> DeleteFolder(Guid id)
         {
             var userId = GetUserId();
             var folder = await _context.Folders
@@ -118,10 +117,12 @@ namespace AlgoTrace.Server.Controllers
 
         private async Task DeleteFolderContentsRecursive(Folder folder)
         {
-            foreach (var file in _context.Files.Where(f => f.FolderId == folder.FolderId))
+            var files = await _context.Files.Where(f => f.FolderId == folder.FolderId).ToListAsync();
+            foreach (var file in files)
             {
                 var fullPath = Path.Combine(_storagePath, file.Path);
                 if (System.IO.File.Exists(fullPath)) System.IO.File.Delete(fullPath);
+                _context.Files.Remove(file);
             }
             var subFolders = await _context.Folders.Where(f => f.ParentId == folder.FolderId).ToListAsync();
             foreach (var sub in subFolders) await DeleteFolderContentsRecursive(sub);
@@ -132,7 +133,7 @@ namespace AlgoTrace.Server.Controllers
         #region File Operations
 
         [HttpPost("file/upload")]
-        public async Task<IActionResult> UploadFile(IFormFile file, [FromQuery] int? folderId)
+        public async Task<IActionResult> UploadFile(IFormFile file, [FromQuery] Guid? folderId)
         {
             var uniqueName = Guid.NewGuid().ToString() + Path.GetExtension(file.FileName);
             var filePath = Path.Combine(_storagePath, uniqueName);
@@ -143,7 +144,8 @@ namespace AlgoTrace.Server.Controllers
             {
                 Name = file.FileName,
                 Path = uniqueName,
-                FolderId = folderId ?? 0
+                UserId = GetUserId(),
+                FolderId = folderId
             };
             _context.Files.Add(fileEntry);
             await _context.SaveChangesAsync();
@@ -151,12 +153,11 @@ namespace AlgoTrace.Server.Controllers
         }
 
         [HttpGet("file/download/{fileId}")]
-        public async Task<IActionResult> DownloadFile(int fileId)
+        public async Task<IActionResult> DownloadFile(Guid fileId)
         {
             var userId = GetUserId();
             var file = await _context.Files
-                .Include(f => f.Folder)
-                .FirstOrDefaultAsync(f => f.FileId == fileId && (f.Folder != null ? f.Folder.UserId == userId : true));
+                .FirstOrDefaultAsync(f => f.FileId == fileId && f.UserId == userId);
 
             if (file == null) return NotFound();
 
@@ -168,12 +169,11 @@ namespace AlgoTrace.Server.Controllers
         }
 
         [HttpDelete("file/{fileId}")]
-        public async Task<IActionResult> DeleteFile(int fileId)
+        public async Task<IActionResult> DeleteFile(Guid fileId)
         {
             var userId = GetUserId();
             var file = await _context.Files
-                .Include(f => f.Folder)
-                .FirstOrDefaultAsync(f => f.FileId == fileId);
+                .FirstOrDefaultAsync(f => f.FileId == fileId && f.UserId == userId);
 
             if (file == null) return NotFound();
 

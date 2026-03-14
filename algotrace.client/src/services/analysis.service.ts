@@ -23,6 +23,24 @@ export interface AnalysisPayload {
   };
 }
 
+export interface AnalysisMultiplePayload {
+  language: string;
+  submission: {
+    files: FileContent[];
+  };
+  compare_with_document_ids: string[];
+  analysis_config: {
+    categories: {
+      category_name: string;
+      methods: string[];
+    }[];
+    parameters: {
+      ignore_comments: boolean;
+      ignore_whitespace: boolean;
+    };
+  };
+}
+
 // Глобальное состояние для хранения результатов анализа
 export const analysisState = reactive({
   currentReport: null as Record<string, unknown> | null
@@ -32,6 +50,10 @@ export const analysisService = {
   async analyze(endpoint: string, payload: AnalysisPayload) {
     // Sending POST request to the specific category endpoint
     return api.post(endpoint, payload);
+  },
+
+  async analyzeMultiple(payload: AnalysisMultiplePayload) {
+    return api.post('/api/analysis/compare-multiple', payload);
   },
 
   async uploadFile(file: File) {

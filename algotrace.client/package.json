@@ -14,11 +14,16 @@
     "lint:eslint": "eslint . --fix --cache"
   },
   "dependencies": {
+    "@guolao/vue-monaco-editor": "^1.6.0",
     "@popperjs/core": "^2.11.8",
     "axios": "^1.13.6",
     "bootstrap": "^5.3.8",
     "bootstrap-icons": "^1.13.1",
+    "echarts": "^6.0.0",
+    "mermaid": "^10.9.5",
+    "vis-network": "^10.0.2",
     "vue": "^3.5.28",
+    "vue-echarts": "^8.0.1",
     "vue-router": "^4.6.4"
   },
   "devDependencies": {

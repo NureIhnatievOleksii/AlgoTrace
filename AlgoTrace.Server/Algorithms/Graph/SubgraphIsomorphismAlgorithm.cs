@@ -12,11 +12,13 @@ namespace AlgoTrace.Server.Algorithms.Graph
             string sourceCode,
             string targetCode,
             Dictionary<string, object> parameters,
-            out double similarityScore
+            out double similarityScore,
+            out CodeGraph graphA,
+            out CodeGraph graphB
         )
         {
-            var graphA = GraphUtils.BuildGraph(sourceCode);
-            var graphB = GraphUtils.BuildGraph(targetCode);
+            graphA = GraphUtils.BuildGraph(sourceCode);
+            graphB = GraphUtils.BuildGraph(targetCode);
 
             var matches = new List<DetailedMatch>();
 

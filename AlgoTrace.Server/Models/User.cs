@@ -5,5 +5,6 @@ namespace AlgoTrace.Server.Models
     public class User : IdentityUser
     {
         public virtual ICollection<Folder> Folders { get; set; } = new List<Folder>();
+        public virtual ICollection<File> Files { get; set; } = new List<File>();
     }
 }

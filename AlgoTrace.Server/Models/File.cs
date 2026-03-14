@@ -2,11 +2,14 @@
 {
     public class File
     {
-        public int FileId { get; set; }
+        public Guid FileId { get; set; } = Guid.NewGuid();
         public string Name { get; set; }
         public string Path { get; set; }
 
-        public int FolderId { get; set; }
-        public virtual Folder Folder { get; set; }
+        public string UserId { get; set; }
+        public virtual User User { get; set; }
+
+        public Guid? FolderId { get; set; }
+        public virtual Folder? Folder { get; set; }
     }
 }

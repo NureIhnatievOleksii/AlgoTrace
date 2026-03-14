@@ -1,60 +1,9 @@
-﻿using System.Text.Json.Serialization;
+﻿﻿﻿﻿using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AlgoTrace.Server.Models.DTO
 {
-    public class AnalysisRequest
-    {
-        public string Language { get; set; } = "csharp";
-        public SubmissionData SubmissionA { get; set; } = new();
-        public SubmissionData SubmissionB { get; set; } = new();
-        public AnalysisConfig AnalysisConfig { get; set; } = new();
-    }
-
-    public class FileData
-    {
-        public string Filename { get; set; } = "";
-        public string Content { get; set; } = "";
-    }
-
-    public class AnalysisConfig
-    {
-        public List<string> Methods { get; set; } = new();
-        public Dictionary<string, bool> Parameters { get; set; } = new();
-    }
-
-    public class AnalysisResponse
-    {
-        public AnalysisInfo Info { get; set; } = new();
-        public List<NodeDto> SubmissionTree { get; set; } = new();
-        public List<NodeDto> ReferenceTree { get; set; } = new();
-    }
-
-    public class AnalysisInfo
-    {
-        public int OverallScore { get; set; }
-        public string Mode { get; set; } = "";
-        public string Date { get; set; } = "";
-    }
-
-    public class NodeDto
-    {
-        public string Name { get; set; } = "";
-        public string Type { get; set; } = "file";
-        public List<NodeDto>? Children { get; set; }
-
-        //Fields for nodes with "file" type
-        public int? Score { get; set; }
-        public string? Path { get; set; }
-        public Dictionary<string, int>? ReferenceScores { get; set; }
-        public Dictionary<string, List<DetailedMatch>>? DetailedMatches { get; set; }
-    }
-
-    // ==========================================
-    // NEW UNIFIED MODELS
-    // ==========================================
-
     public class UnifiedAnalysisRequest
     {
         [JsonPropertyName("language")]
@@ -110,6 +59,21 @@ namespace AlgoTrace.Server.Models.DTO
 
         [JsonPropertyName("categories_results")]
         public List<CategoryResult> CategoriesResults { get; set; } = new();
+
+        [JsonPropertyName("source_files")]
+        public SourceFilesInfo SourceFiles { get; set; } = new();
+    }
+
+    public class SourceFilesInfo
+    {
+        [JsonPropertyName("file_a")]
+        public string FileA { get; set; } = "";
+        [JsonPropertyName("file_b")]
+        public string FileB { get; set; } = "";
+        [JsonPropertyName("name_a")]
+        public string NameA { get; set; } = "";
+        [JsonPropertyName("name_b")]
+        public string NameB { get; set; } = "";
     }
 
     public class CategoryResult
@@ -214,4 +178,37 @@ namespace AlgoTrace.Server.Models.DTO
 
     // For graph/tree we can use generic objects or Dictionary<string,object>
     // as the visualization structure can be complex.
+
+    public class MultiDocumentAnalysisRequest
+    {
+        [JsonPropertyName("language")]
+        public string Language { get; set; }
+
+        [JsonPropertyName("submission")]
+        public SubmissionData Submission { get; set; }
+
+        [JsonPropertyName("compare_with_document_ids")]
+        public List<string> CompareWithDocumentIds { get; set; }
+
+        [JsonPropertyName("analysis_config")]
+        public AnalysisConfigMultiDoc AnalysisConfig { get; set; }
+    }
+
+    public class AnalysisConfigMultiDoc
+    {
+        [JsonPropertyName("categories")]
+        public List<CategoryMethods> Categories { get; set; }
+
+        [JsonPropertyName("parameters")]
+        public Dictionary<string, object> Parameters { get; set; }
+    }
+
+    public class CategoryMethods
+    {
+        [JsonPropertyName("category_name")]
+        public string CategoryName { get; set; }
+
+        [JsonPropertyName("methods")]
+        public List<string> Methods { get; set; }
+    }
 }

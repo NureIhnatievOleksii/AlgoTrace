@@ -1,0 +1,859 @@
+<script setup lang="ts">
+import { computed, onMounted, ref, shallowRef, watch, nextTick } from 'vue';
+import { useRouter } from 'vue-router';
+import { analysisState } from '@/services/analysis.service';
+import InteractiveGraph from './InteractiveGraph.vue';
+import { VueMonacoEditor } from '@guolao/vue-monaco-editor';
+import { use } from 'echarts/core';
+import { RadarChart } from 'echarts/charts';
+import { TitleComponent, TooltipComponent, LegendComponent } from 'echarts/components';
+import { CanvasRenderer } from 'echarts/renderers';
+import VChart from 'vue-echarts';
+
+use([TitleComponent, TooltipComponent, LegendComponent, RadarChart, CanvasRenderer]);
+
+const router = useRouter();
+const activeCategory = ref<string | null>(null);
+const activeAlgorithm = ref<any>(null);
+
+onMounted(() => {
+  if (!analysisState.currentReport) {
+    router.push('/');
+    return;
+  }
+  const rep = analysisState.currentReport as any;
+  if (rep.categories_results && rep.categories_results.length > 0) {
+    selectCategory(rep.categories_results[0]);
+  }
+});
+
+const report = computed<any>(() => analysisState.currentReport);
+
+const globalScore = computed(() => {
+  return report.value?.global_similarity_score ? Math.round(report.value.global_similarity_score * 100) : 0;
+});
+
+const getScoreColorHex = (score: number) => {
+  if (score < 30) return '#10b981'; // Изумрудный (success)
+  if (score < 70) return '#f59e0b'; // Янтарный (warning)
+  return '#ef4444'; // Красный (danger)
+};
+
+const getBgColor = (score: number) => {
+  if (score < 30) return 'bg-success bg-opacity-25 text-success border border-success border-opacity-50';
+  if (score < 70) return 'bg-warning bg-opacity-25 text-warning border border-warning border-opacity-50';
+  return 'bg-danger bg-opacity-25 text-danger border border-danger border-opacity-50';
+};
+
+const formatScore = (score: number) => Math.round((score || 0) * 100) + '%';
+
+const formatCategoryName = (name: string) => {
+  const map: Record<string, string> = {
+    'text_based': 'Текстовий аналіз',
+    'token_based': 'Токенний аналіз',
+    'tree_based': 'Аналіз AST-дерев',
+    'graph_based': 'Аналіз графів (CFG/PDG)',
+    'metrics_based': 'Метрики коду'
+  };
+  return map[name] || name;
+};
+
+const selectCategory = (cat: any) => {
+  activeCategory.value = cat.category_name;
+  if (cat.algorithms && cat.algorithms.length > 0) {
+    activeAlgorithm.value = cat.algorithms[0];
+  } else {
+    activeAlgorithm.value = null;
+  }
+};
+
+const selectAlgorithm = (cat: any, algo: any) => {
+  activeCategory.value = cat.category_name;
+  activeAlgorithm.value = algo;
+};
+
+const aggregateMatches = (matches: any[]) => {
+  if (!matches || !Array.isArray(matches)) return [];
+  const counts: Record<string, { type: string, severity: string, count: number }> = {};
+  matches.forEach(m => {
+    const key = m.type + '_' + m.severity;
+    if (!counts[key]) counts[key] = { type: m.type, severity: m.severity, count: 0 };
+    counts[key].count++;
+  });
+  return Object.values(counts);
+};
+
+const getLinesContent = (code: string | undefined, lines: number[] | undefined, type: string) => {
+  if (!code || !lines || lines.length === 0) return '';
+  const codeLines = code.split('\n');
+  const result: string[] = [];
+
+  if (type === 'ast_tree_mapping' && lines.length === 2 && lines[0] !== lines[1]) {
+     for (let i = lines[0]; i <= lines[1]; i++) {
+        if (codeLines[i - 1]) result.push(`${i}: ${codeLines[i - 1].trim()}`);
+     }
+  } else {
+     const uniqueLines = [...new Set(lines)].sort((a, b) => a - b);
+     uniqueLines.forEach(l => {
+       if (codeLines[l - 1]) result.push(`${l}: ${codeLines[l - 1].trim()}`);
+     });
+  }
+  return result.join('\n');
+};
+
+// --- ИНТЕГРАЦИЯ MONACO EDITOR ---
+const editorRefA = shallowRef();
+const editorRefB = shallowRef();
+let monacoInstance: any = null;
+let decorationsCollectionA: any = null;
+let decorationsCollectionB: any = null;
+
+const handleEditorMount = (editor: any, monaco: any, fileId: 'a' | 'b') => {
+  if (fileId === 'a') editorRefA.value = editor;
+  else editorRefB.value = editor;
+  monacoInstance = monaco;
+  updateMonacoDecorations();
+};
+
+const getHighlightedLines = (fileId: 'a' | 'b', evidenceType: string, evidenceData: any) => {
+  const lines = new Set<number>();
+  if (!evidenceData) return [];
+    if (evidenceType === 'text_highlight' && evidenceData?.matched_blocks) {
+      evidenceData.matched_blocks.forEach((match: any) => {
+        const start = fileId === 'a' ? match.start_line_a : match.start_line_b;
+        const end = fileId === 'a' ? match.end_line_a : match.end_line_b;
+      for (let i = start; i <= end; i++) lines.add(i);
+      });
+    } else if (evidenceType === 'graph_mapping' && evidenceData?.matches) {
+       evidenceData.matches.forEach((match: any) => {
+         const matchLines = fileId === 'a' ? match.left_lines : match.right_lines;
+       if (matchLines && Array.isArray(matchLines)) matchLines.forEach((l: number) => lines.add(l));
+       });
+    } else if (evidenceType === 'ast_tree_mapping' && Array.isArray(evidenceData)) {
+       evidenceData.forEach((match: any) => {
+         const matchLines = fileId === 'a' ? match.leftLines : match.rightLines;
+         if (matchLines && Array.isArray(matchLines)) {
+           if (matchLines.length === 2 && matchLines[0] !== matchLines[1]) {
+            for (let i = matchLines[0]; i <= matchLines[1]; i++) lines.add(i);
+         } else {
+            matchLines.forEach((l: number) => lines.add(l));
+         }
+         }
+       });
+    }
+  return Array.from(lines);
+};
+
+const updateMonacoDecorations = () => {
+  if (!editorRefA.value || !editorRefB.value || !activeAlgorithm.value || !monacoInstance) return;
+  const algo = activeAlgorithm.value;
+
+  const linesA = getHighlightedLines('a', algo.evidence_type, algo.evidence);
+  const linesB = getHighlightedLines('b', algo.evidence_type, algo.evidence);
+
+  const createRanges = (lines: number[]) => lines.map(l => ({
+    range: new monacoInstance.Range(l, 1, l, 1),
+    options: { isWholeLine: true, className: 'plagiarism-highlight', marginClassName: 'plagiarism-margin' }
+  }));
+
+  if (decorationsCollectionA) decorationsCollectionA.clear();
+  if (decorationsCollectionB) decorationsCollectionB.clear();
+
+  decorationsCollectionA = editorRefA.value.createDecorationsCollection(createRanges(linesA));
+  decorationsCollectionB = editorRefB.value.createDecorationsCollection(createRanges(linesB));
+};
+
+watch(activeAlgorithm, () => nextTick(updateMonacoDecorations));
+
+// --- ИНТЕГРАЦИЯ VIS-NETWORK ---
+const buildASTVisData = (nodes: any[]) => {
+  const visNodes: any[] = [];
+  const visEdges: any[] = [];
+  if (!nodes) return { nodes: visNodes, edges: visEdges };
+  nodes.forEach((n: any) => {
+    visNodes.push({ id: n.id, label: (n.label || '').replace(/[\[\]{}()<>]/g, ' ') });
+    if (n.children && Array.isArray(n.children)) {
+      n.children.forEach((cId: any) => visEdges.push({ from: n.id, to: cId }));
+    }
+  });
+  return { nodes: visNodes, edges: visEdges };
+};
+
+const buildCFGVisData = (graph: any) => {
+  const visNodes: any[] = [];
+  const visEdges: any[] = [];
+  if (!graph || !graph.nodes) return { nodes: visNodes, edges: visEdges };
+  graph.nodes.forEach((n: any) => {
+    let content = (n.content || '').replace(/["\\]/g, "'").replace(/[\[\]{}()<>]/g, ' ');
+    if (content.length > 40) content = content.substring(0, 40) + '...';
+    visNodes.push({ id: n.id, label: `[L${n.line}]\n${content}`, group: n.type });
+  });
+  if (graph.edges && Array.isArray(graph.edges)) {
+    graph.edges.forEach((e: any) => visEdges.push({ from: e.source, to: e.target, label: e.type || '' }));
+  }
+  return { nodes: visNodes, edges: visEdges };
+};
+
+// --- ИНТЕГРАЦИЯ ECHARTS ---
+const metricsChartOption = computed(() => {
+  if (activeAlgorithm.value?.evidence_type !== 'metric_comparison') return null;
+  const ev = activeAlgorithm.value.evidence;
+  const keys = Object.keys(ev.metrics_a || {});
+  if (keys.length === 0) return null;
+  const maxValues = keys.map(k => Math.max(ev.metrics_a[k] || 0, ev.metrics_b[k] || 0) * 1.2 || 10);
+
+  return {
+    backgroundColor: 'transparent',
+    tooltip: { trigger: 'item' },
+    legend: { data: ['Файл 1', 'Файл 2'], textStyle: { color: '#495057' }, bottom: 0 },
+    radar: {
+      indicator: keys.map((k, i) => ({ name: k.replace(/_/g, ' '), max: maxValues[i] })),
+      splitArea: { areaStyle: { color: ['rgba(0,0,0,0.02)', 'rgba(0,0,0,0.05)'] } },
+      splitLine: { lineStyle: { color: 'rgba(0,0,0,0.1)' } },
+      axisName: { color: '#212529' },
+      axisLine: { lineStyle: { color: 'rgba(0,0,0,0.1)' } }
+    },
+    series: [{
+      name: 'Метрики',
+      type: 'radar',
+      data: [
+        { value: keys.map(k => ev.metrics_a[k]), name: 'Файл 1', itemStyle: { color: '#3b82f6' }, areaStyle: { color: 'rgba(59, 130, 246, 0.3)' } },
+        { value: keys.map(k => ev.metrics_b[k]), name: 'Файл 2', itemStyle: { color: '#ef4444' }, areaStyle: { color: 'rgba(239, 68, 68, 0.3)' } }
+      ]
+    }]
+  };
+});
+</script>
+
+<template>
+  <div class="min-vh-100 dashboard-bg pb-5" v-if="report">
+    <!-- Light Glassmorphism Navbar -->
+    <nav class="navbar navbar-light bg-white bg-opacity-75 border-bottom py-3 backdrop-blur sticky-top z-3 shadow-sm">
+      <div class="container-fluid px-4">
+        <div class="d-flex align-items-center">
+          <button @click="router.push('/')" class="btn btn-outline-primary rounded-pill me-3 px-4 fw-bold d-flex align-items-center transition-all hover-glow">
+            <i class="bi bi-arrow-left me-2"></i> Назад
+          </button>
+          <span class="navbar-brand fw-bold fs-4 mb-0 text-dark d-flex align-items-center">
+            <i class="bi bi-layers-half text-primary me-2 fs-3 glow-text-primary"></i>
+            Аналітика Коду
+          </span>
+        </div>
+        <div class="badge bg-light border px-4 py-2 rounded-pill text-secondary shadow-sm font-monospace">
+          ID: {{ report.analysis_id }}
+        </div>
+      </div>
+    </nav>
+
+    <div class="container-fluid px-4 mt-4">
+      <div class="row g-4 h-100">
+
+        <!-- SIDEBAR -->
+        <div class="col-xl-3 col-lg-4 d-flex flex-column gap-4">
+           <!-- Global Score Widget -->
+           <div class="glass-card p-5 text-center position-relative overflow-hidden">
+             <div class="position-absolute top-0 start-0 w-100 h-100 opacity-25" :style="`background: radial-gradient(circle at center, ${getScoreColorHex(globalScore)} 0%, transparent 70%);`"></div>
+             <h5 class="fw-bold text-dark mb-4 position-relative z-1 text-uppercase tracking-wider fs-6">Глобальна схожість</h5>
+
+             <div class="position-relative d-inline-flex align-items-center justify-content-center mb-4" style="width: 200px; height: 200px;">
+               <div class="position-absolute w-100 h-100 rounded-circle" :style="`background: ${getScoreColorHex(globalScore)}; filter: blur(40px); opacity: 0.15;`"></div>
+               <svg class="w-100 h-100 position-relative z-1" viewBox="0 0 100 100">
+                 <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(0,0,0,0.05)" stroke-width="8" />
+                 <circle cx="50" cy="50" r="42" fill="none"
+                         :stroke="getScoreColorHex(globalScore)"
+                         stroke-width="8"
+                         stroke-dasharray="264"
+                         :stroke-dashoffset="264 - (264 * globalScore) / 100"
+                         stroke-linecap="round"
+                         transform="rotate(-90 50 50)"
+                         style="transition: stroke-dashoffset 2s cubic-bezier(0.4, 0, 0.2, 1);" />
+               </svg>
+               <div class="position-absolute text-dark z-2 d-flex flex-column align-items-center justify-content-center w-100">
+                 <span class="fw-black glow-text" style="font-size: 3.5rem; line-height: 1; letter-spacing: -2px;" :style="`color: ${getScoreColorHex(globalScore)}`">{{ globalScore }}%</span>
+               </div>
+             </div>
+
+             <div class="position-relative z-1">
+                <span class="badge border bg-white px-4 py-2 rounded-pill fs-6 fw-bold shadow-sm" :style="`color: ${getScoreColorHex(globalScore)}; border-color: ${getScoreColorHex(globalScore)} !important;`">
+                  <i class="bi me-2" :class="globalScore < 30 ? 'bi-shield-check' : globalScore < 70 ? 'bi-exclamation-triangle' : 'bi-x-octagon'"></i>
+                  {{ globalScore < 30 ? 'Низька схожість' : globalScore < 70 ? 'Середня схожість' : 'Високий ризик' }}
+                </span>
+             </div>
+           </div>
+
+           <!-- Categories Menu -->
+           <div class="glass-card p-3 flex-grow-1 custom-scrollbar overflow-auto" style="max-height: calc(100vh - 400px);">
+              <h6 class="text-muted text-uppercase fw-bold mb-3 px-3" style="letter-spacing: 1.5px; font-size: 0.75rem;">Дерево Аналізу</h6>
+              <div class="d-flex flex-column gap-2">
+                <div v-for="cat in report.categories_results" :key="cat.category_name">
+                   <!-- Category Button -->
+                   <button class="btn w-100 text-start d-flex justify-content-between align-items-center p-3 rounded-4 glass-btn"
+                           :class="{'glass-btn-active': activeCategory === cat.category_name}"
+                           @click="selectCategory(cat)">
+                       <span class="fw-bold text-dark d-flex align-items-center">
+                         <i class="bi me-3 fs-5 opacity-75 text-primary" :class="{
+                           'bi-file-text': cat.category_name === 'text_based',
+                           'bi-braces': cat.category_name === 'token_based',
+                           'bi-diagram-3': cat.category_name === 'tree_based',
+                           'bi-share': cat.category_name === 'graph_based',
+                           'bi-bar-chart': cat.category_name === 'metrics_based'
+                         }"></i>
+                         {{ formatCategoryName(cat.category_name) }}
+                       </span>
+                       <span class="badge rounded-pill shadow-sm" :class="getBgColor(cat.category_similarity_score * 100)">{{ formatScore(cat.category_similarity_score) }}</span>
+                   </button>
+
+                   <!-- Algorithms List -->
+                   <transition name="slide-fade">
+                     <div v-if="activeCategory === cat.category_name" class="ps-4 pe-2 py-2 d-flex flex-column gap-1 overflow-hidden border-start border-primary border-opacity-25 ms-4 mt-2 mb-2">
+                         <button v-for="algo in cat.algorithms" :key="algo.method"
+                                 class="btn w-100 text-start p-2 rounded-3 small algo-btn"
+                                 :class="{'algo-btn-active': activeAlgorithm?.method === algo.method}"
+                                 @click="selectAlgorithm(cat, algo)">
+                             <div class="d-flex justify-content-between align-items-center">
+                                 <span class="text-capitalize text-dark fw-medium"><i class="bi bi-cpu me-2 text-primary opacity-75"></i> {{ algo.method.replace(/_/g, ' ') }}</span>
+                                 <span class="text-muted fw-bold font-monospace" style="font-size: 0.75rem;">{{ formatScore(algo.similarity_score) }}</span>
+                             </div>
+                         </button>
+                     </div>
+                   </transition>
+                </div>
+              </div>
+           </div>
+        </div>
+
+        <!-- MAIN CONTENT AREA -->
+        <div class="col-xl-9 col-lg-8">
+           <div class="glass-card h-100 d-flex flex-column overflow-hidden">
+
+              <div v-if="!activeAlgorithm" class="d-flex flex-column align-items-center justify-content-center h-100 p-5 text-muted">
+                <i class="bi bi-mouse-3 display-1 mb-3 opacity-50"></i>
+                <h4 class="fw-light text-uppercase tracking-wider">Оберіть алгоритм для деталей</h4>
+              </div>
+
+              <div v-else class="d-flex flex-column h-100 animate__fadeIn">
+                <!-- Header -->
+                <div class="p-4 border-bottom d-flex justify-content-between align-items-center bg-light">
+                   <div>
+                     <h3 class="fw-bolder text-dark mb-1 text-capitalize d-flex align-items-center">
+                       <i class="bi bi-box-seam text-primary me-3"></i> {{ activeAlgorithm.method.replace(/_/g, ' ') }}
+                     </h3>
+                     <span class="text-muted small font-monospace"><i class="bi bi-info-circle me-1"></i> Тип доказів: {{ activeAlgorithm.evidence_type }}</span>
+                   </div>
+                   <div class="text-end">
+                     <div class="text-muted small mb-2 fw-bold text-uppercase tracking-wider" style="font-size: 0.7rem;">Рівень Збігу</div>
+                     <span class="badge px-4 py-2 rounded-pill fs-5 shadow-sm border" :class="getBgColor(activeAlgorithm.similarity_score * 100)">
+                       {{ formatScore(activeAlgorithm.similarity_score) }}
+                     </span>
+                   </div>
+                </div>
+
+                <!-- Body -->
+                <div class="p-4 flex-grow-1 overflow-auto custom-scrollbar bg-white">
+
+                   <!-- MAC OS DUAL CODE VIEWER (Для структурних збігів) -->
+                   <div v-if="['text_highlight', 'ast_tree_mapping', 'graph_mapping'].includes(activeAlgorithm.evidence_type) && report.source_files" class="row g-4 mb-5">
+                     <div class="col-xl-6">
+                       <div class="mac-window rounded-4 overflow-hidden border shadow-sm d-flex flex-column h-100">
+                          <div class="mac-header bg-light d-flex align-items-center px-3 py-2 border-bottom">
+                             <div class="d-flex gap-2">
+                                <div class="rounded-circle bg-danger" style="width: 12px; height: 12px;"></div>
+                                <div class="rounded-circle bg-warning" style="width: 12px; height: 12px;"></div>
+                                <div class="rounded-circle bg-success" style="width: 12px; height: 12px;"></div>
+                             </div>
+                             <span class="ms-3 font-monospace text-secondary small fw-bold">{{ report.source_files.name_a || 'Файл 1' }}</span>
+                          </div>
+                          <div class="mac-body bg-white flex-grow-1 position-relative" style="height: 500px;">
+                             <VueMonacoEditor
+                               v-model:value="report.source_files.file_a"
+                               theme="vs"
+                               :language="report.language || 'cpp'"
+                               :options="{ readOnly: true, minimap: { enabled: false }, scrollBeyondLastLine: false, fontSize: 13, smoothScrolling: true }"
+                               @mount="(editor, monaco) => handleEditorMount(editor, monaco, 'a')"
+                             />
+                          </div>
+                       </div>
+                     </div>
+                     <div class="col-xl-6">
+                       <div class="mac-window rounded-4 overflow-hidden border shadow-sm d-flex flex-column h-100">
+                          <div class="mac-header bg-light d-flex align-items-center px-3 py-2 border-bottom">
+                             <div class="d-flex gap-2">
+                                <div class="rounded-circle bg-danger" style="width: 12px; height: 12px;"></div>
+                                <div class="rounded-circle bg-warning" style="width: 12px; height: 12px;"></div>
+                                <div class="rounded-circle bg-success" style="width: 12px; height: 12px;"></div>
+                             </div>
+                             <span class="ms-3 font-monospace text-secondary small fw-bold">{{ report.source_files.name_b || 'Файл 2' }}</span>
+                          </div>
+                          <div class="mac-body bg-white flex-grow-1 position-relative" style="height: 500px;">
+                             <VueMonacoEditor
+                               v-model:value="report.source_files.file_b"
+                               theme="vs"
+                               :language="report.language || 'cpp'"
+                               :options="{ readOnly: true, minimap: { enabled: false }, scrollBeyondLastLine: false, fontSize: 13, smoothScrolling: true }"
+                               @mount="(editor, monaco) => handleEditorMount(editor, monaco, 'b')"
+                             />
+                          </div>
+                       </div>
+                     </div>
+                   </div>
+
+                   <!-- Text Highlight Specific Accordions -->
+                   <div v-if="activeAlgorithm.evidence_type === 'text_highlight' && activeAlgorithm.evidence?.matched_blocks?.length">
+                      <h6 class="text-muted text-uppercase fw-bold mb-3 tracking-wider"><i class="bi bi-layout-text-sidebar-reverse me-2"></i> Деталі текстових збігів</h6>
+                      <div class="accordion light-accordion shadow-sm" :id="'acc-' + activeAlgorithm.method">
+                        <div class="accordion-item" v-for="(block, bIdx) in activeAlgorithm.evidence.matched_blocks" :key="bIdx">
+                          <h2 class="accordion-header">
+                            <button class="accordion-button fw-bold" :class="{'collapsed': bIdx !== 0}" type="button" data-bs-toggle="collapse" :data-bs-target="'#col-' + activeAlgorithm.method + '-' + bIdx">
+                              <i class="bi bi-file-diff text-primary me-3 fs-5"></i>
+                              Збіг #{{ bIdx + 1 }} <span class="badge bg-light text-secondary ms-3 font-monospace fw-normal border">Рядки: {{ block.start_line_a }}-{{ block.end_line_a }} ⟷ {{ block.start_line_b }}-{{ block.end_line_b }}</span>
+                            </button>
+                          </h2>
+                          <div :id="'col-' + activeAlgorithm.method + '-' + bIdx" class="accordion-collapse collapse" :class="{'show': bIdx === 0}" :data-bs-parent="'#acc-' + activeAlgorithm.method">
+                            <div class="accordion-body p-0 d-flex flex-column flex-md-row">
+                              <div class="w-100 w-md-50 border-end border-opacity-10">
+                                <div class="bg-light px-4 py-2 border-bottom small fw-bold text-muted d-flex align-items-center">
+                                  <i class="bi bi-file-earmark-code me-2"></i> {{ block.file_a || 'Файл 1' }}
+                                </div>
+                                <pre class="m-0 p-4 text-danger custom-scrollbar bg-white" style="white-space: pre-wrap; font-family: 'Fira Code', monospace; font-size: 0.85rem;"><code>{{ block.content_a }}</code></pre>
+                              </div>
+                              <div class="w-100 w-md-50">
+                                <div class="bg-light px-4 py-2 border-bottom small fw-bold text-muted d-flex align-items-center">
+                                  <i class="bi bi-file-earmark-code me-2"></i> {{ block.file_b || 'Файл 2' }}
+                                </div>
+                                <pre class="m-0 p-4 text-danger custom-scrollbar bg-white" style="white-space: pre-wrap; font-family: 'Fira Code', monospace; font-size: 0.85rem;"><code>{{ block.content_b }}</code></pre>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                   </div>
+
+                   <!-- Token Sequence specific table -->
+                   <div v-else-if="activeAlgorithm.evidence_type === 'token_sequence'">
+                      <div v-if="!activeAlgorithm.evidence?.matched_hashes || activeAlgorithm.evidence.matched_hashes.length === 0" class="text-center py-5">
+                        <i class="bi bi-shield-check text-success display-1 d-block mb-3 opacity-50 glow-text"></i>
+                        <h5 class="text-muted">Збігів токенів не знайдено</h5>
+                      </div>
+                      <div v-else class="table-responsive bg-white rounded-4 border shadow-sm">
+                        <table class="table light-table align-middle mb-0">
+                          <thead class="bg-light text-uppercase tracking-wider" style="font-size: 0.75rem;">
+                            <tr>
+                              <th class="py-4 px-4">Опис збігу (Хеш послідовності)</th>
+                              <th class="py-4 px-4 text-center">Наявність (Файл 1)</th>
+                              <th class="py-4 px-4 text-center">Наявність (Файл 2)</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr v-for="(hash, hIdx) in activeAlgorithm.evidence.matched_hashes" :key="hIdx">
+                              <td class="py-3 px-4">
+                                <span class="badge bg-light text-secondary border me-3 font-monospace px-2 py-1">{{ hash.hash_value }}</span>
+                                <span class="fw-medium text-dark font-monospace small">{{ hash.token_sequence }}</span>
+                              </td>
+                              <td class="py-3 px-4 text-center">
+                                 <span v-if="hash.occurrences.find((o: any) => o.submission === 'a')" class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-50 px-3 py-2 rounded-pill">
+                                    Знайдено
+                                 </span>
+                                 <span v-else class="text-muted">-</span>
+                              </td>
+                              <td class="py-3 px-4 text-center">
+                                 <span v-if="hash.occurrences.find((o: any) => o.submission === 'b')" class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-50 px-3 py-2 rounded-pill">
+                                    Знайдено
+                                 </span>
+                                 <span v-else class="text-muted">-</span>
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                   </div>
+
+                   <!-- AST Mapping Specific -->
+                   <div v-else-if="activeAlgorithm.evidence_type === 'ast_tree_mapping'">
+                      <div class="d-flex align-items-center justify-content-between mb-4">
+                        <h6 class="text-muted text-uppercase fw-bold mb-0 tracking-wider"><i class="bi bi-diagram-3 me-2"></i> Зведення збігів AST</h6>
+                        <span class="badge bg-primary bg-opacity-25 border border-primary border-opacity-50 rounded-pill px-3 py-2 text-primary shadow-sm">{{ activeAlgorithm.evidence.length || activeAlgorithm.evidence.matched_subtrees?.length || 0 }} збігів загалом</span>
+                      </div>
+
+                      <div v-if="Array.isArray(activeAlgorithm.evidence)">
+                          <div class="table-responsive mb-5 bg-white rounded-4 border shadow-sm">
+                            <table class="table light-table mb-0 align-middle">
+                              <thead class="bg-light text-uppercase tracking-wider" style="font-size: 0.75rem;">
+                                <tr>
+                                  <th class="py-4 px-4">Тип збігу</th>
+                                  <th class="py-4 px-4 text-center">Кількість</th>
+                                  <th class="py-4 px-4">Рівень</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                <tr v-for="(match, idx) in aggregateMatches(activeAlgorithm.evidence)" :key="idx">
+                                  <td class="py-3 px-4 fw-medium text-dark"><i class="bi bi-diagram-2 text-secondary opacity-75 me-3 fs-5"></i>{{ match.type }}</td>
+                                  <td class="py-3 px-4 text-center"><span class="badge bg-light border rounded-pill px-3 py-2 fs-6 text-dark">{{ match.count }}</span></td>
+                                  <td class="py-3 px-4">
+                                     <span class="badge rounded-pill px-3 py-2 border" :class="match.severity === 'high' ? 'bg-danger bg-opacity-25 text-danger border-danger border-opacity-50' : match.severity === 'med' ? 'bg-warning bg-opacity-25 text-warning border-warning border-opacity-50' : 'bg-info bg-opacity-25 text-info border-info border-opacity-50'">{{ match.severity }}</span>
+                                  </td>
+                                </tr>
+                              </tbody>
+                            </table>
+                         </div>
+
+                          <!-- Деталізація (Докази) -->
+                          <div class="accordion light-accordion mt-4 shadow-sm" :id="'acc-ast-' + activeAlgorithm.method">
+                            <div class="accordion-item border-0">
+                              <h2 class="accordion-header">
+                                <button class="accordion-button collapsed fw-bold py-3" type="button" data-bs-toggle="collapse" :data-bs-target="'#col-ast-' + activeAlgorithm.method">
+                                  <i class="bi bi-braces-asterisk text-primary fs-5 me-3"></i> Детальний мапінг рядків
+                                </button>
+                              </h2>
+                              <div :id="'col-ast-' + activeAlgorithm.method" class="accordion-collapse collapse" :data-bs-parent="'#acc-ast-' + activeAlgorithm.method">
+                                <div class="accordion-body p-0 custom-scrollbar" style="max-height: 450px; overflow-y: auto;">
+                                   <ul class="list-group list-group-flush">
+                                      <li v-for="(m, idx) in activeAlgorithm.evidence" :key="idx" class="list-group-item bg-transparent flex-column py-4 gap-3 border-bottom border-opacity-10">
+                                         <div class="d-flex justify-content-between align-items-center w-100 mb-2">
+                                           <span class="small fw-bold text-dark"><i class="bi bi-link-45deg text-secondary fs-5 me-2"></i>{{ m.type }} (Рівень: {{ m.severity }})</span>
+                                           <span v-if="!((m.leftLines && m.leftLines.length) || (m.rightLines && m.rightLines.length))" class="badge bg-light text-secondary border px-3 py-2 rounded-pill">Структурний збіг (весь код)</span>
+                                         </div>
+                                         <div class="d-flex flex-column flex-md-row gap-3 w-100" v-if="(m.leftLines && m.leftLines.length) || (m.rightLines && m.rightLines.length)">
+                                            <div class="flex-grow-1 border border-opacity-10 rounded-3 bg-white overflow-hidden" style="flex-basis: 0;">
+                                               <div class="bg-light px-3 py-2 border-bottom text-muted small fw-bold d-flex justify-content-between">
+                                                 <span>Файл 1</span>
+                                               </div>
+                                               <pre class="m-0 p-3 text-primary custom-scrollbar font-monospace" style="font-size: 0.8rem; max-height: 150px; overflow-y: auto; white-space: pre-wrap; word-wrap: break-word;"><code>{{ getLinesContent(report.source_files?.file_a, m.leftLines, 'ast_tree_mapping') }}</code></pre>
+                                            </div>
+                                            <div class="d-flex align-items-center justify-content-center">
+                                              <div class="bg-light border rounded-circle p-2 shadow-sm d-flex align-items-center justify-content-center">
+                                                <i class="bi bi-arrow-left-right text-muted"></i>
+                                              </div>
+                                            </div>
+                                            <div class="flex-grow-1 border border-opacity-10 rounded-3 bg-white overflow-hidden" style="flex-basis: 0;">
+                                               <div class="bg-light px-3 py-2 border-bottom text-muted small fw-bold d-flex justify-content-between">
+                                                 <span>Файл 2</span>
+                                               </div>
+                                               <pre class="m-0 p-3 text-danger custom-scrollbar font-monospace" style="font-size: 0.8rem; max-height: 150px; overflow-y: auto; white-space: pre-wrap; word-wrap: break-word;"><code>{{ getLinesContent(report.source_files?.file_b, m.rightLines, 'ast_tree_mapping') }}</code></pre>
+                                            </div>
+                                         </div>
+                                      </li>
+                                   </ul>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                      </div>
+                      <div v-else-if="activeAlgorithm.evidence?.matched_subtrees" class="row g-4 mt-2">
+                          <div class="col-12" v-for="(subtree, sIdx) in activeAlgorithm.evidence.matched_subtrees" :key="sIdx">
+                            <div class="p-4 border rounded-4 bg-white shadow-sm">
+                              <div class="fw-bold mb-4 fs-5 text-dark border-bottom pb-3">
+                                <i class="bi bi-diagram-3 text-primary me-2"></i> Вузол: <span class="text-primary">{{ subtree.node_type }}</span>
+                              </div>
+                              <div class="row g-4">
+                                <div class="col-md-6">
+                                  <div class="card h-100 border-0 bg-transparent shadow-none">
+                                    <div class="card-header bg-light text-dark fw-bold py-3 border rounded-top-3"><i class="bi bi-diagram-2 me-2"></i> AST Вузли (Файл 1)</div>
+                                    <div class="p-3 border-bottom border-start border-end bg-white d-flex justify-content-center">
+                                      <InteractiveGraph :graph-data="buildASTVisData(subtree.nodes_a)" />
+                                    </div>
+                                    <div class="card-body p-0 custom-scrollbar bg-white border border-top-0 rounded-bottom-3" style="max-height: 200px; overflow-y: auto;">
+                                      <ul class="list-group list-group-flush small">
+                                         <li class="list-group-item bg-transparent text-dark border-bottom py-2" v-for="node in subtree.nodes_a" :key="node.id">
+                                            <i class="bi bi-record-circle text-primary me-3" style="font-size: 0.7rem;"></i>
+                                            <span class="fw-medium text-dark">{{ node.label }}</span>
+                                            <span class="text-muted ms-2 font-monospace" style="font-size: 0.7rem;">[{{ node.id }}]</span>
+                                         </li>
+                                      </ul>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div class="col-md-6">
+                                  <div class="card h-100 border-0 bg-transparent shadow-none">
+                                    <div class="card-header bg-light text-dark fw-bold py-3 border rounded-top-3"><i class="bi bi-diagram-2-fill me-2 text-danger"></i> AST Вузли (Файл 2)</div>
+                                    <div class="p-3 border-bottom border-start border-end bg-white d-flex justify-content-center">
+                                      <InteractiveGraph :graph-data="buildASTVisData(subtree.nodes_b)" />
+                                    </div>
+                                    <div class="card-body p-0 custom-scrollbar bg-white border border-top-0 rounded-bottom-3" style="max-height: 200px; overflow-y: auto;">
+                                      <ul class="list-group list-group-flush small">
+                                         <li class="list-group-item bg-transparent text-dark border-bottom py-2" v-for="node in subtree.nodes_b" :key="node.id">
+                                            <i class="bi bi-record-circle text-danger me-3" style="font-size: 0.7rem;"></i>
+                                            <span class="fw-medium text-dark">{{ node.label }}</span>
+                                            <span class="text-muted ms-2 font-monospace" style="font-size: 0.7rem;">[{{ node.id }}]</span>
+                                         </li>
+                                      </ul>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                      </div>
+                   </div>
+
+                   <!-- Graph Mapping Specific -->
+                   <div v-else-if="activeAlgorithm.evidence_type === 'graph_mapping'">
+                      <div class="d-flex align-items-center justify-content-between mb-4">
+                        <h6 class="text-muted text-uppercase fw-bold mb-0 tracking-wider"><i class="bi bi-share me-2"></i> Зведення збігів графів</h6>
+                        <span class="badge bg-primary bg-opacity-25 border border-primary border-opacity-50 rounded-pill px-3 py-2 text-primary shadow-sm">{{ activeAlgorithm.evidence.matches?.length || 0 }} збігів</span>
+                      </div>
+                      <div class="table-responsive mb-5 bg-white rounded-4 border shadow-sm">
+                        <table class="table light-table mb-0 align-middle">
+                          <thead class="bg-light text-uppercase tracking-wider" style="font-size: 0.75rem;">
+                            <tr>
+                              <th class="py-4 px-4">Тип збігу</th>
+                              <th class="py-4 px-4 text-center">Кількість</th>
+                              <th class="py-4 px-4">Рівень</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr v-for="(match, idx) in aggregateMatches(activeAlgorithm.evidence.matches)" :key="idx">
+                              <td class="py-3 px-4 fw-medium text-dark"><i class="bi bi-bezier2 text-secondary opacity-75 me-3 fs-5"></i>{{ match.type }}</td>
+                              <td class="py-3 px-4 text-center"><span class="badge bg-light border rounded-pill px-3 py-2 fs-6 text-dark">{{ match.count }}</span></td>
+                              <td class="py-3 px-4">
+                                 <span class="badge rounded-pill px-3 py-2 border" :class="match.severity === 'high' ? 'bg-danger bg-opacity-25 text-danger border-danger border-opacity-50' : match.severity === 'med' ? 'bg-warning bg-opacity-25 text-warning border-warning border-opacity-50' : 'bg-info bg-opacity-25 text-info border-info border-opacity-50'">{{ match.severity }}</span>
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+
+                      <div class="row g-4">
+                        <div class="col-md-6">
+                           <div class="card h-100 shadow-sm border rounded-4 overflow-hidden">
+                             <div class="card-header bg-light border-bottom p-3 d-flex align-items-center text-dark fw-bold">
+                               <i class="bi bi-box me-2 text-primary"></i> Вузли графа 1
+                             </div>
+                             <div class="p-3 border-bottom bg-white d-flex justify-content-center">
+                                <InteractiveGraph :graph-data="buildCFGVisData(activeAlgorithm.evidence.graph_a)" />
+                             </div>
+                             <div class="card-body p-0 custom-scrollbar bg-white" style="max-height: 350px; overflow-y: auto;">
+                               <ul class="list-group list-group-flush">
+                                 <li class="list-group-item bg-transparent d-flex align-items-start py-3 border-bottom" v-for="node in activeAlgorithm.evidence.graph_a?.nodes" :key="node.id">
+                                   <div class="flex-grow-1">
+                                     <div class="mb-2"><span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-50" style="font-size: 0.7rem;">{{ node.type }}</span></div>
+                                     <code class="text-dark bg-light border px-3 py-2 rounded-3 d-block font-monospace" style="font-size: 0.8rem; word-break: break-all;">{{ node.content }}</code>
+                                   </div>
+                                 </li>
+                               </ul>
+                             </div>
+                           </div>
+                        </div>
+                        <div class="col-md-6">
+                           <div class="card h-100 shadow-sm border rounded-4 overflow-hidden">
+                             <div class="card-header bg-light border-bottom p-3 d-flex align-items-center text-dark fw-bold">
+                               <i class="bi bi-box me-2 text-danger"></i> Вузли графа 2
+                             </div>
+                             <div class="p-3 border-bottom bg-white d-flex justify-content-center">
+                                <InteractiveGraph :graph-data="buildCFGVisData(activeAlgorithm.evidence.graph_b)" />
+                             </div>
+                             <div class="card-body p-0 custom-scrollbar bg-white" style="max-height: 350px; overflow-y: auto;">
+                               <ul class="list-group list-group-flush">
+                                 <li class="list-group-item bg-transparent d-flex align-items-start py-3 border-bottom" v-for="node in activeAlgorithm.evidence.graph_b?.nodes" :key="node.id">
+                                   <div class="flex-grow-1">
+                                     <div class="mb-2"><span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-50" style="font-size: 0.7rem;">{{ node.type }}</span></div>
+                                     <code class="text-dark bg-light border px-3 py-2 rounded-3 d-block font-monospace" style="font-size: 0.8rem; word-break: break-all;">{{ node.content }}</code>
+                                   </div>
+                                 </li>
+                               </ul>
+                             </div>
+                           </div>
+                        </div>
+                      </div>
+                   </div>
+
+                   <!-- Metric Comparison Specific -->
+                   <div v-else-if="activeAlgorithm.evidence_type === 'metric_comparison'">
+                      <div class="row g-4">
+                        <div class="col-xl-4 col-lg-5">
+                          <div class="d-flex flex-column gap-4 h-100">
+                            <div class="glass-card border p-4 position-relative overflow-hidden flex-grow-1 shadow-sm">
+                            <h5 class="text-primary mb-4 d-flex align-items-center fw-bold position-relative z-1"><i class="bi bi-bar-chart-steps me-3"></i> Метрики Файл 1</h5>
+                            <div class="d-flex flex-column gap-2 position-relative z-1">
+                               <div v-for="(val, key) in activeAlgorithm.evidence.metrics_a" :key="key" class="d-flex justify-content-between align-items-center border-bottom py-3">
+                                  <span class="text-muted text-capitalize fw-medium">{{ String(key).replace(/_/g, ' ') }}</span>
+                                  <span class="fw-bold fs-4 text-dark font-monospace">{{ typeof val === 'number' && !Number.isInteger(val) ? val.toFixed(2) : val }}</span>
+                               </div>
+                            </div>
+                          </div>
+                            <div class="glass-card border p-4 position-relative overflow-hidden flex-grow-1 shadow-sm">
+                            <h5 class="text-danger mb-4 d-flex align-items-center fw-bold position-relative z-1"><i class="bi bi-bar-chart-steps me-3"></i> Метрики Файл 2</h5>
+                            <div class="d-flex flex-column gap-2 position-relative z-1">
+                               <div v-for="(val, key) in activeAlgorithm.evidence.metrics_b" :key="key" class="d-flex justify-content-between align-items-center border-bottom py-3">
+                                  <span class="text-muted text-capitalize fw-medium">{{ String(key).replace(/_/g, ' ') }}</span>
+                                  <span class="fw-bold fs-4 text-dark font-monospace">{{ typeof val === 'number' && !Number.isInteger(val) ? val.toFixed(2) : val }}</span>
+                               </div>
+                            </div>
+                          </div>
+                          </div>
+                        </div>
+                        <div class="col-xl-8 col-lg-7">
+                           <div class="glass-card p-4 h-100 d-flex flex-column align-items-center justify-content-center border shadow-sm">
+                              <h5 class="text-muted mb-4 fw-bold text-uppercase tracking-wider">Радар Метрик</h5>
+                              <v-chart :option="metricsChartOption" class="w-100" style="min-height: 400px;" autoresize />
+                           </div>
+                        </div>
+                      </div>
+                      <div v-if="activeAlgorithm.evidence.conclusion" class="alert bg-info bg-opacity-10 border border-info mt-5 mb-0 text-center shadow-sm d-flex justify-content-center align-items-center rounded-4 py-4 backdrop-blur">
+                        <i class="bi bi-robot me-3 display-5 text-info glow-text"></i>
+                        <span class="text-dark fs-5 fw-medium">{{ activeAlgorithm.evidence.conclusion }}</span>
+                      </div>
+                   </div>
+
+                   <!-- Fallback Fallback -->
+                   <div v-else>
+                      <div class="bg-light p-4 rounded-4 shadow-sm border custom-scrollbar" style="max-height: 400px; overflow: auto;">
+                        <pre class="m-0 text-muted small" style="font-family: 'Fira Code', monospace;"><code>{{ JSON.stringify(activeAlgorithm.evidence, null, 2) }}</code></pre>
+                      </div>
+                   </div>
+
+                </div>
+             </div>
+           </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;700&family=Inter:wght@400;600;800;900&display=swap');
+
+.dashboard-bg {
+  background: #f8f9fa;
+  background-image:
+    radial-gradient(at 0% 0%, rgba(13, 110, 253, 0.1) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(220, 53, 69, 0.05) 0px, transparent 50%);
+  color: #212529;
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+.backdrop-blur {
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 1.5rem;
+  box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.05);
+}
+
+.glass-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  transition: all 0.3s ease;
+  color: #6c757d;
+}
+.glass-btn:hover {
+  background: rgba(0, 0, 0, 0.03);
+}
+.glass-btn-active {
+  background: rgba(13, 110, 253, 0.08) !important;
+  border: 1px solid rgba(13, 110, 253, 0.2) !important;
+  box-shadow: inset 0 0 10px rgba(13, 110, 253, 0.05);
+}
+
+.algo-btn {
+  background: transparent;
+  border: none;
+  transition: all 0.2s ease;
+  color: #495057;
+}
+.algo-btn:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+.algo-btn-active {
+  background: rgba(0, 0, 0, 0.05) !important;
+  border-left: 3px solid #0d6efd;
+  border-radius: 0 0.5rem 0.5rem 0;
+  font-weight: bold;
+}
+
+.fw-black {
+  font-weight: 900;
+}
+.tracking-wider {
+  letter-spacing: 0.05em;
+}
+.glow-text {
+  text-shadow: 0 0 30px currentColor;
+}
+.glow-text-primary {
+  text-shadow: 0 0 20px #0d6efd;
+}
+.hover-glow:hover {
+  box-shadow: 0 0 15px rgba(13, 110, 253, 0.3);
+}
+
+:deep(.plagiarism-highlight) {
+  background-color: rgba(220, 53, 69, 0.15) !important;
+}
+:deep(.plagiarism-margin) {
+  background-color: rgba(220, 53, 69, 0.5) !important;
+  width: 4px !important;
+  margin-left: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(0,0,0,0.05);
+  border-radius: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(0,0,0,0.15);
+  border-radius: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(0,0,0,0.25);
+}
+
+.slide-fade-enter-active, .slide-fade-leave-active {
+  transition: all 0.3s ease;
+}
+.slide-fade-enter-from, .slide-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-10px);
+}
+
+.animate__fadeIn {
+  animation: fadeIn 0.4s ease-out forwards;
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Light Table */
+.light-table {
+  --bs-table-bg: transparent;
+  --bs-table-color: #212529;
+  color: #212529;
+}
+.light-table th { color: #6c757d; font-weight: 600; border-bottom: 1px solid rgba(0,0,0,0.1) !important; }
+.light-table td { border-bottom: 1px solid rgba(0,0,0,0.05) !important; }
+.light-table tbody tr:hover { background-color: rgba(0, 0, 0, 0.02) !important; }
+
+/* Light Accordion */
+.light-accordion .accordion-item {
+  background-color: transparent;
+  border: 1px solid rgba(0,0,0,0.08);
+  margin-bottom: 0.5rem;
+  border-radius: 1rem !important;
+  overflow: hidden;
+}
+.light-accordion .accordion-button {
+  background-color: rgba(0,0,0,0.02);
+  color: #212529;
+  box-shadow: none;
+}
+.light-accordion .accordion-button:not(.collapsed) {
+  background-color: rgba(13, 110, 253, 0.05);
+  color: #0d6efd;
+}
+.light-accordion .accordion-body {
+  background-color: rgba(255,255,255,0.7);
+  color: #495057;
+}
+</style>

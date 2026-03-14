@@ -1,4 +1,4 @@
-﻿using System.Text.RegularExpressions;
+﻿﻿using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
@@ -10,7 +10,15 @@ namespace AlgoTrace.Server.Utils
         {
             if (string.IsNullOrWhiteSpace(line))
                 return string.Empty;
-            return System.Text.RegularExpressions.Regex.Replace(line, @"\s+", "").ToLower();
+            
+            try
+            {
+                return Regex.Replace(line, @"\s+", "", RegexOptions.None, TimeSpan.FromSeconds(1)).ToLower();
+            }
+            catch (RegexMatchTimeoutException)
+            {
+                return line.Replace(" ", "").Replace("\t", "").ToLower();
+            }
         }
 
         public static string[] GetLines(string code)

@@ -2,15 +2,15 @@
 import { ref } from 'vue';
 import api from '@/services/api';
 
-interface Node {
-  id: number;
+export interface Node {
+  id: string;
   name: string;
   type: 'folder' | 'file';
 }
 
 const props = defineProps<{
   node: Node;
-  selectedIds: number[];
+  selectedIds: string[];
 }>();
 
 const emit = defineEmits(['toggle-selection']);
@@ -27,8 +27,8 @@ const toggleFolder = async () => {
     isLoading.value = true;
     try {
       const res = await api.get(`/api/directory/folder/${props.node.id}`);
-      const folders = res.data.folders.map((f: { folderId: number; name: string }) => ({ id: f.folderId, name: f.name, type: 'folder' }));
-      const files = res.data.files.map((f: { fileId: number; name: string }) => ({ id: f.fileId, name: f.name, type: 'file' }));
+      const folders = res.data.folders.map((f: { folderId: string; name: string }) => ({ id: f.folderId, name: f.name, type: 'folder' }));
+      const files = res.data.files.map((f: { fileId: string; name: string }) => ({ id: f.fileId, name: f.name, type: 'file' }));
       children.value = [...folders, ...files];
     } catch (err) {
       console.error("Error loading subfolder:", err);
@@ -45,9 +45,9 @@ const toggleFolder = async () => {
       <span @click="toggleFolder" class="me-1 cursor-pointer" style="width: 20px;">
         <i v-if="node.type === 'folder'" :class="isOpen ? 'bi bi-chevron-down' : 'bi bi-chevron-right'" class="small text-muted"></i>
       </span>
-      <input type="checkbox" 
-             :checked="selectedIds.includes(node.id)" 
-             @change="emit('toggle-selection', node.id)"
+      <input type="checkbox"
+             :checked="selectedIds.includes(node.id)"
+             @change="emit('toggle-selection', node)"
              class="form-check-input me-2 mt-0">
       <div @click="toggleFolder" class="d-flex align-items-center cursor-pointer flex-grow-1">
         <i :class="node.type === 'folder' ? 'bi bi-folder-fill text-warning' : 'bi bi-file-earmark-code text-primary'" class="me-2"></i>
@@ -56,7 +56,7 @@ const toggleFolder = async () => {
       </div>
     </div>
     <div v-if="isOpen && children.length > 0">
-      <FileTreeItem v-for="child in children" :key="child.id" :node="child" :selected-ids="selectedIds" @toggle-selection="(id) => emit('toggle-selection', id)" />
+      <FileTreeItem v-for="child in children" :key="child.id" :node="child" :selected-ids="selectedIds" @toggle-selection="(node) => emit('toggle-selection', node)" />
     </div>
   </div>
 </template>

@@ -1,4 +1,5 @@
 using AlgoTrace.Server.Models.DTO;
+using AlgoTrace.Server.Algorithms.Graph;
 
 namespace AlgoTrace.Server.Interfaces
 {
@@ -10,7 +11,9 @@ namespace AlgoTrace.Server.Interfaces
             string sourceCode,
             string targetCode,
             Dictionary<string, object> parameters,
-            out double similarityScore
+            out double similarityScore,
+            out CodeGraph graphA,
+            out CodeGraph graphB
         );
     }
 }

@@ -1,9 +1,11 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using AlgoTrace.Server.Algorithms.Graph;
 using AlgoTrace.Server.Algorithms.Metric;
 using AlgoTrace.Server.Interfaces;
 using AlgoTrace.Server.Models.DTO;
 using AlgoTrace.Server.ParserFactory;
+using AlgoTrace.Server.Utils;
 
 namespace AlgoTrace.Server.Services
 {
@@ -48,6 +50,14 @@ namespace AlgoTrace.Server.Services
 
             if (fileA == null || fileB == null)
                 return response;
+
+            response.SourceFiles = new SourceFilesInfo
+            {
+                FileA = fileA.Content,
+                FileB = fileB.Content,
+                NameA = fileA.Filename ?? "Файл 1",
+                NameB = fileB.Filename ?? "Файл 2"
+            };
 
             string contentA = fileA.Content;
             string contentB = fileB.Content;
@@ -129,6 +139,9 @@ namespace AlgoTrace.Server.Services
             double totalScore = 0;
             int count = 0;
 
+            var sLinesA = SourceNormalizer.GetLines(a);
+            var sLinesB = SourceNormalizer.GetLines(b);
+
             foreach (var algo in _textAlgos)
             {
                 // Map config names (e.g. "exact_substring") to algo names/keys
@@ -143,16 +156,29 @@ namespace AlgoTrace.Server.Services
                 var evidence = new TextEvidence();
                 foreach (var m in matches)
                 {
+                    int startA = m.LeftLines.FirstOrDefault();
+                    int endA = m.LeftLines.LastOrDefault();
+                    int startB = m.RightLines.FirstOrDefault();
+                    int endB = m.RightLines.LastOrDefault();
+
+                    string snippetA = startA > 0 && startA <= sLinesA.Length
+                        ? string.Join("\n", sLinesA.Skip(startA - 1).Take(Math.Max(1, endA - startA + 1)))
+                        : "";
+                    string snippetB = startB > 0 && startB <= sLinesB.Length
+                        ? string.Join("\n", sLinesB.Skip(startB - 1).Take(Math.Max(1, endB - startB + 1)))
+                        : "";
+
                     evidence.MatchedBlocks.Add(
                         new
                         {
                             file_a = nameA,
                             file_b = nameB,
-                            start_line_a = m.LeftLines.FirstOrDefault(),
-                            end_line_a = m.LeftLines.LastOrDefault(),
-                            start_line_b = m.RightLines.FirstOrDefault(),
-                            end_line_b = m.RightLines.LastOrDefault(),
-                            content = "Snippet hidden for brevity", // Or extract from source using lines
+                            start_line_a = startA,
+                            end_line_a = endA,
+                            start_line_b = startB,
+                            end_line_b = endB,
+                            content_a = snippetA,
+                            content_b = snippetB
                         }
                     );
                 }
@@ -193,24 +219,29 @@ namespace AlgoTrace.Server.Services
                 totalScore += score / 100.0;
                 count++;
 
-                // Mocking structure based on matches since existing algos return generic match
                 var evidence = new TokenEvidence();
-                if (matches.Any())
+                foreach (var match in matches)
                 {
                     evidence.MatchedHashes.Add(
                         new
                         {
-                            hash_value = "generated_hash",
-                            token_sequence = "KEYWORD(while) IDENTIFIER ...",
+                            hash_value = match.Id.ToString(),
+                            token_sequence = match.Type,
                             occurrences = new[]
                             {
                                 new
                                 {
                                     submission = "a",
-                                    token_start_index = matches[0].LeftLines[0],
-                                    token_end_index = matches[0].LeftLines[1],
+                                    token_start_index = match.LeftLines.FirstOrDefault(),
+                                    token_end_index = match.LeftLines.LastOrDefault()
                                 },
-                            },
+                                new
+                                {
+                                    submission = "b",
+                                    token_start_index = match.RightLines.FirstOrDefault(),
+                                    token_end_index = match.RightLines.LastOrDefault()
+                                }
+                            }
                         }
                     );
                 }
@@ -286,7 +317,7 @@ namespace AlgoTrace.Server.Services
                 if (!methods.Contains(algo.Key))
                     continue;
 
-                var matches = algo.Execute(a, b, parameters, out double score);
+                var matches = algo.Execute(a, b, parameters, out double score, out CodeGraph graphA, out CodeGraph graphB);
                 totalScore += score / 100.0;
                 count++;
 
@@ -298,9 +329,25 @@ namespace AlgoTrace.Server.Services
                         EvidenceType = "graph_mapping",
                         Evidence = new
                         {
-                            nodes = new[] { new { id = "n1", type = "mock_node" } },
-                            edges = new object[] { },
-                        },
+                            graph_a = new
+                            {
+                                nodes = graphA.Nodes.Select(n => new { id = n.Id, line = n.LineIndex + 1, content = n.Content, type = n.Type, variables = n.Variables }),
+                                edges = graphA.Edges.Select(e => new { source = e.SourceId, target = e.TargetId, type = e.Type })
+                            },
+                            graph_b = new
+                            {
+                                nodes = graphB.Nodes.Select(n => new { id = n.Id, line = n.LineIndex + 1, content = n.Content, type = n.Type, variables = n.Variables }),
+                                edges = graphB.Edges.Select(e => new { source = e.SourceId, target = e.TargetId, type = e.Type })
+                            },
+                            matches = matches.Select(m => new
+                            {
+                                id = m.Id,
+                                type = m.Type,
+                                severity = m.Severity,
+                                left_lines = m.LeftLines,
+                                right_lines = m.RightLines
+                            }).ToList()
+                        }
                     }
                 );
             }
@@ -348,6 +395,19 @@ namespace AlgoTrace.Server.Services
                     {
                         { "volume", hB.Volume },
                         { "difficulty", hB.Difficulty },
+                    };
+                }
+                else if (algo.Key == "mccabe")
+                {
+                    var cA = MetricUtils.CalculateMcCabeComplexity(a);
+                    var cB = MetricUtils.CalculateMcCabeComplexity(b);
+                    evidence.MetricsA = new Dictionary<string, double>
+                    {
+                        { "complexity", cA }
+                    };
+                    evidence.MetricsB = new Dictionary<string, double>
+                    {
+                        { "complexity", cB }
                     };
                 }
 
