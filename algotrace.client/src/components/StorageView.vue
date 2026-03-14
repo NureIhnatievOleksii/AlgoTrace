@@ -6,19 +6,19 @@ import api from '@/services/api';
 
 // --- ИНТЕРФЕЙСЫ ---
 interface FileEntry {
-  fileId: number;
+  fileId: string;
   name: string;
 }
 
 interface FolderEntry {
-  folderId: number;
+  folderId: string;
   name: string;
 }
 
 interface FolderContent {
-  folderId: number | null;
+  folderId: string | null;
   name: string;
-  parentId: number | null;
+  parentId: string | null;
   folders: FolderEntry[];
   files: FileEntry[];
 }
@@ -26,7 +26,7 @@ interface FolderContent {
 const router = useRouter();
 
 // --- СОСТОЯНИЕ ---
-const currentFolderContent = ref<FolderContent | null>(null); 
+const currentFolderContent = ref<FolderContent | null>(null);
 const selectedFile = ref<FileEntry | null>(null);
 const fileContent = ref<string>('');
 const isLoading = ref(false);
@@ -34,18 +34,18 @@ const isRoot = ref(true);
 
 const newFolderName = ref('');
 const fileInput = ref<HTMLInputElement | null>(null);
-const editingId = ref<number | null>(null);
+const editingId = ref<string | null>(null);
 const renameValue = ref('');
 
 // --- МЕТОДЫ ---
-const openFolder = async (folderId: number | null = null) => {
+const openFolder = async (folderId: string | null = null) => {
   isLoading.value = true;
   isRoot.value = folderId === null;
   try {
     const url = folderId ? `/api/directory/folder/${folderId}` : '/api/directory/folder';
     const res = await api.get<FolderContent>(url);
     currentFolderContent.value = res.data;
-    selectedFile.value = null; 
+    selectedFile.value = null;
   } catch (err) {
     console.error("Access error:", err);
     if (!isRoot.value) alert("Помилка доступу до папки");
@@ -65,12 +65,13 @@ const handleFileUpload = async (event: Event) => {
 
   const formData = new FormData();
   formData.append('file', file);
-  
-  const currentId = currentFolderContent.value?.folderId || 0;
+
+  const currentId = currentFolderContent.value?.folderId || '';
+  const query = currentId ? `?folderId=${currentId}` : '';
 
   try {
     isLoading.value = true;
-    await api.post(`/api/directory/file/upload?folderId=${currentId}`, formData, {
+    await api.post(`/api/directory/file/upload${query}`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     });
     await openFolder(currentFolderContent.value?.folderId || null);
@@ -79,7 +80,7 @@ const handleFileUpload = async (event: Event) => {
     alert("Помилка завантаження файлу");
   } finally {
     isLoading.value = false;
-    target.value = ''; 
+    target.value = '';
   }
 };
 
@@ -88,8 +89,8 @@ const viewFile = async (file: FileEntry) => {
   fileContent.value = 'Завантаження...';
   try {
     // Используем blob и text() для избежания 'any' в responseType
-    const res = await api.get<string>(`/api/directory/file/download/${file.fileId}`, { 
-      responseType: 'text' 
+    const res = await api.get<string>(`/api/directory/file/download/${file.fileId}`, {
+      responseType: 'text'
     });
     fileContent.value = res.data;
   } catch (err) {
@@ -98,11 +99,11 @@ const viewFile = async (file: FileEntry) => {
   }
 };
 
-const downloadFile = (fileId: number) => {
+const downloadFile = (fileId: string) => {
   window.open(`${api.defaults.baseURL}/api/directory/file/download/${fileId}`, '_blank');
 };
 
-const deleteFile = async (id: number) => {
+const deleteFile = async (id: string) => {
   if (!confirm('Видалити цей файл?')) return;
   try {
     await api.delete(`/api/directory/file/${id}`);
@@ -130,12 +131,12 @@ const createNewFolder = async () => {
   }
 };
 
-const startRename = (id: number, currentName: string) => {
+const startRename = (id: string, currentName: string) => {
   editingId.value = id;
   renameValue.value = currentName;
 };
 
-const saveRename = async (id: number) => {
+const saveRename = async (id: string) => {
   if (!renameValue.value.trim()) return;
   try {
     await api.put(`/api/directory/folder/${id}/rename`, JSON.stringify(renameValue.value), {
@@ -149,7 +150,7 @@ const saveRename = async (id: number) => {
   }
 };
 
-const deleteFolder = async (id: number) => {
+const deleteFolder = async (id: string) => {
   if (!confirm('Видалити папку та все вкладене?')) return;
   try {
     await api.delete(`/api/directory/folder/${id}`);
@@ -192,14 +193,14 @@ onMounted(() => {
 
     <div class="flex-grow-1 d-flex overflow-hidden">
       <div class="flex-grow-1 bg-white d-flex flex-column">
-        
+
         <div class="p-3 border-bottom d-flex align-items-center justify-content-between bg-light bg-opacity-25">
           <div class="d-flex align-items-center gap-3">
-            <button v-if="!isRoot" @click="openFolder(currentFolderContent?.parentId)" 
+            <button v-if="!isRoot" @click="openFolder(currentFolderContent?.parentId)"
                     class="btn btn-sm btn-white border shadow-sm px-3 rounded-pill">
               <i class="bi bi-arrow-left me-1"></i> Назад
             </button>
-            
+
             <nav aria-label="breadcrumb">
               <ol class="breadcrumb mb-0 py-1 fw-bold fs-6">
                 <li class="breadcrumb-item"><a href="#" @click.prevent="openFolder(null)" class="text-decoration-none">Моє сховище</a></li>
@@ -225,7 +226,7 @@ onMounted(() => {
           <div v-if="isLoading" class="text-center py-5">
             <div class="spinner-border text-primary opacity-50"></div>
           </div>
-          
+
           <table v-else class="table table-hover align-middle mb-0">
             <thead class="table-light small text-uppercase opacity-75 fw-bold">
               <tr>
@@ -238,11 +239,11 @@ onMounted(() => {
                 <td class="ps-4 cursor-pointer" @click="editingId !== folder.folderId && openFolder(folder.folderId)">
                   <div class="d-flex align-items-center py-1">
                     <i class="bi bi-folder-fill text-warning fs-3 me-3"></i>
-                    
+
                     <div v-if="editingId === folder.folderId" class="input-group input-group-sm w-75 shadow-sm" @click.stop>
-                      <input 
-                        v-model="renameValue" 
-                        @keyup.enter="saveRename(folder.folderId)" 
+                      <input
+                        v-model="renameValue"
+                        @keyup.enter="saveRename(folder.folderId)"
                         @keyup.esc="editingId = null"
                         class="form-control"
                         autoFocus
@@ -254,7 +255,7 @@ onMounted(() => {
                         <i class="bi bi-x-lg"></i>
                       </button>
                     </div>
-                    
+
                     <span v-else class="fw-medium text-dark fs-6">{{ folder.name }}</span>
                   </div>
                 </td>
@@ -265,7 +266,7 @@ onMounted(() => {
                   </div>
                 </td>
               </tr>
-              <tr v-for="file in currentFolderContent?.files" :key="file.fileId" 
+              <tr v-for="file in currentFolderContent?.files" :key="file.fileId"
                   :class="{'table-primary bg-opacity-10': selectedFile?.fileId === file.fileId}" class="border-bottom">
                 <td class="ps-4 cursor-pointer" @click="viewFile(file)">
                   <div class="d-flex align-items-center py-1">
@@ -328,13 +329,13 @@ onMounted(() => {
 }
 
 .group-hover:hover .opacity-0-hover { opacity: 1 !important; }
-.opacity-0-hover { 
-  opacity: 0; 
-  transition: opacity 0.2s ease-in-out; 
+.opacity-0-hover {
+  opacity: 0;
+  transition: opacity 0.2s ease-in-out;
 }
 
-.breadcrumb-item + .breadcrumb-item::before { 
-  content: "›"; 
+.breadcrumb-item + .breadcrumb-item::before {
+  content: "›";
   font-size: 1.2rem;
   line-height: 1;
   vertical-align: middle;

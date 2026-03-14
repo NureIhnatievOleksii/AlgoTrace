@@ -216,12 +216,10 @@ namespace AlgoTrace.Server.Migrations
                 name: "Folders",
                 columns: table => new
                 {
-                    FolderId = table
-                        .Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
+                    FolderId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     Name = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     UserId = table.Column<string>(type: "nvarchar(450)", nullable: false),
-                    ParentId = table.Column<int>(type: "int", nullable: true),
+                    ParentId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
                 },
                 constraints: table =>
                 {
@@ -247,22 +245,27 @@ namespace AlgoTrace.Server.Migrations
                 name: "Files",
                 columns: table => new
                 {
-                    FileId = table
-                        .Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
+                    FileId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     Name = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     Path = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    FolderId = table.Column<int>(type: "int", nullable: false),
+                    UserId = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    FolderId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Files", x => x.FileId);
                     table.ForeignKey(
+                        name: "FK_Files_AspNetUsers_UserId",
+                        column: x => x.UserId,
+                        principalTable: "AspNetUsers",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade
+                    );
+                    table.ForeignKey(
                         name: "FK_Files_Folders_FolderId",
                         column: x => x.FolderId,
                         principalTable: "Folders",
-                        principalColumn: "FolderId",
-                        onDelete: ReferentialAction.Cascade
+                        principalColumn: "FolderId"
                     );
                 }
             );
@@ -318,6 +321,8 @@ namespace AlgoTrace.Server.Migrations
                 table: "Files",
                 column: "FolderId"
             );
+
+            migrationBuilder.CreateIndex(name: "IX_Files_UserId", table: "Files", column: "UserId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Folders_ParentId",

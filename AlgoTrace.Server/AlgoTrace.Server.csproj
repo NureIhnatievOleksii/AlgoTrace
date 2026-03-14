@@ -33,8 +33,4 @@
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
     </ProjectReference>
   </ItemGroup>
-
-  <ItemGroup>
-    <None Include="Interfaces\ITokenAnalysisService.cs" />
-  </ItemGroup>
 </Project>

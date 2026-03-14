@@ -23,7 +23,15 @@ namespace AlgoTrace.Server.Algorithms.Tree
             return 0;
         }
 
-        private int GetTreeHash(UniversalNode node) =>
-            HashCode.Combine(node.Type, node.Children.Sum(c => GetTreeHash(c)));
+        private int GetTreeHash(UniversalNode node)
+        {
+            var hash = new HashCode();
+            hash.Add(node.Type);
+            foreach (var child in node.Children)
+            {
+                hash.Add(GetTreeHash(child));
+            }
+            return hash.ToHashCode();
+        }
     }
 }

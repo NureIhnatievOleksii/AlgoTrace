@@ -2,15 +2,9 @@
 import { ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { authService, authState } from '../services/auth.service';
-import { analysisService, analysisState, type AnalysisPayload, type FileContent } from '../services/analysis.service';
+import { analysisService, analysisState, type AnalysisPayload, type AnalysisMultiplePayload, type FileContent } from '../services/analysis.service';
 import api from '../services/api';
-import FileTreeItem from '@/components/FileTreeItem.vue';
-
-interface Node {
-  id: number;
-  name: string;
-  type: 'folder' | 'file';
-}
+import FileTreeItem, { type Node } from '@/components/FileTreeItem.vue';
 
 const router = useRouter();
 
@@ -28,7 +22,7 @@ const code2 = ref('');
 
 // Стан для дерева сховища
 const rootNodes = ref<Node[]>([]);
-const selectedStorageIds = ref<number[]>([]);
+const selectedStorageIds = ref<string[]>([]);
 const isStorageLoading = ref(false);
 
 const selectedLanguage = ref('python');
@@ -89,8 +83,8 @@ const loadStorageTree = async () => {
   isStorageLoading.value = true;
   try {
     const res = await api.get('/api/directory/folder');
-    const folders = res.data.folders.map((f: { folderId: number; name: string }) => ({ id: f.folderId, name: f.name, type: 'folder' }));
-    const files = res.data.files.map((f: { fileId: number; name: string }) => ({ id: f.fileId, name: f.name, type: 'file' }));
+    const folders = res.data.folders.map((f: { folderId: string; name: string }) => ({ id: f.folderId, name: f.name, type: 'folder' }));
+    const files = res.data.files.map((f: { fileId: string; name: string }) => ({ id: f.fileId, name: f.name, type: 'file' }));
     rootNodes.value = [...folders, ...files];
   } catch (err) {
     console.error("Error loading storage tree:", err);
@@ -106,7 +100,7 @@ watch(inputMode, (newVal) => {
 });
 
 // --- Рекурсивне виділення папок ---
-const checkNodeAndChildren = async (id: number) => {
+const checkNodeAndChildren = async (id: string) => {
   if (!selectedStorageIds.value.includes(id)) selectedStorageIds.value.push(id);
   try {
     const res = await api.get(`/api/directory/folder/${id}`);
@@ -121,7 +115,7 @@ const checkNodeAndChildren = async (id: number) => {
   }
 };
 
-const uncheckNodeAndChildren = async (id: number) => {
+const uncheckNodeAndChildren = async (id: string) => {
   selectedStorageIds.value = selectedStorageIds.value.filter(selId => selId !== id);
   try {
     const res = await api.get(`/api/directory/folder/${id}`);
@@ -136,12 +130,24 @@ const uncheckNodeAndChildren = async (id: number) => {
   }
 };
 
-const toggleStorageSelection = async (id: number) => {
-  const isSelected = selectedStorageIds.value.includes(id);
+const toggleStorageSelection = async (node: Node) => {
+  const isSelected = selectedStorageIds.value.includes(node.id);
+
+  // Для файлів просто додаємо/видаляємо ID без зайвих запитів
+  if (node.type === 'file') {
+    if (isSelected) {
+      selectedStorageIds.value = selectedStorageIds.value.filter(selId => selId !== node.id);
+    } else {
+      selectedStorageIds.value.push(node.id);
+    }
+    return;
+  }
+
+  // Для папок залишаємо стару логіку, оскільки треба рекурсивно обробити дочірні елементи
   if (isSelected) {
-    await uncheckNodeAndChildren(id);
+    await uncheckNodeAndChildren(node.id);
   } else {
-    await checkNodeAndChildren(id);
+    await checkNodeAndChildren(node.id);
   }
 };
 
@@ -253,28 +259,8 @@ const startComparison = async () => {
         language = selectedLanguage.value;
         submissionAData = { files: [{ filename: "submission.txt", content: code1.value }] };
       }
-
-      // Права панель (сховище)
-      const storageFiles: FileContent[] = [];
-      for (const id of selectedStorageIds.value) {
-        try {
-          // Завантажуємо лише файли (спроба завантажити папку викличе помилку та перейде в catch)
-          const res = await api.get(`/api/directory/file/download/${id}`, { responseType: 'text' });
-          storageFiles.push({ filename: `storage_file_${id}.txt`, content: res.data });
-        } catch {
-          // Це може бути ID папки, ігноруємо
-        }
-      }
-      if (storageFiles.length === 0) {
-        alert('Не вдалося завантажити файли зі сховища.');
-        isLoading.value = false;
-        return;
-      }
-      submissionBData = { files: storageFiles };
     }
 
-    // 2. Формування execute_categories
-    const executeCategories: Record<string, string[]> = {};
     const categoryMap: Record<string, string> = {
       'text': 'text_based',
       'token': 'token_based',
@@ -283,32 +269,67 @@ const startComparison = async () => {
       'metric': 'metrics_based'
     };
 
-    for (const [catId, methods] of Object.entries(selectedMethods.value)) {
-      if (methods && methods.length > 0) {
-        const apiCategoryKey = categoryMap[catId];
-        if (apiCategoryKey) {
-          executeCategories[apiCategoryKey] = methods;
+      if (inputMode.value === 'storage') {
+        // Формування execute_categories для множинного порівняння
+        const executeCategories: { category_name: string; methods: string[] }[] = [];
+
+        for (const [catId, methods] of Object.entries(selectedMethods.value)) {
+          if (methods && methods.length > 0) {
+            const apiCategoryKey = categoryMap[catId] || catId;
+            executeCategories.push({
+              category_name: apiCategoryKey,
+              methods: methods
+            });
+          }
+        }
+
+        const payload: AnalysisMultiplePayload = {
+          language: language,
+          submission: submissionAData!,
+          compare_with_document_ids: selectedStorageIds.value,
+          analysis_config: {
+            categories: executeCategories,
+            parameters: { ignore_comments: true, ignore_whitespace: true }
+          }
+        };
+
+        const response = await analysisService.analyzeMultiple(payload);
+
+        if (response.data) {
+          analysisState.currentReport = response.data as Record<string, unknown>;
+          router.push('/analyzer');
+        }
+      } else {
+        // Формування execute_categories для уніфікованого порівняння (2 файли чи 2 тексти)
+        const executeCategories: Record<string, string[]> = {};
+
+        for (const [catId, methods] of Object.entries(selectedMethods.value)) {
+          if (methods && methods.length > 0) {
+            const apiCategoryKey = categoryMap[catId];
+            if (apiCategoryKey) {
+              executeCategories[apiCategoryKey] = methods;
+            }
+          }
+        }
+
+        // Відправка запиту
+        const payload: AnalysisPayload = {
+          language: language,
+          submission_a: submissionAData!,
+          submission_b: submissionBData!,
+          analysis_config: {
+            parameters: { ignore_comments: true, ignore_whitespace: true },
+            execute_categories: executeCategories
+          }
+        };
+
+        const response = await analysisService.analyze('/api/analysis/unified', payload);
+
+        if (response.data) {
+          analysisState.currentReport = response.data as Record<string, unknown>;
+          router.push('/analyzer');
         }
       }
-    }
-
-    // 3. Відправка запиту
-    const payload: AnalysisPayload = {
-      language: language,
-      submission_a: submissionAData!,
-      submission_b: submissionBData!,
-      analysis_config: {
-        parameters: { ignore_comments: true, ignore_whitespace: true },
-        execute_categories: executeCategories
-      }
-    };
-
-    const response = await analysisService.analyze('/api/analysis/unified', payload);
-
-    if (response.data) {
-      analysisState.currentReport = response.data as Record<string, unknown>;
-      router.push('/analyzer');
-    }
   } catch (e) {
     console.error('Analysis failed', e);
     alert('Помилка під час аналізу. Перевірте консоль або спробуйте пізніше.');
@@ -537,7 +558,7 @@ const resendEmail = async () => {
               <button class="btn btn-sm rounded-pill px-3 fw-bold" :class="storageLeftMode === 'file' ? 'btn-primary' : 'btn-light text-secondary'" @click="storageLeftMode = 'file'">Файл</button>
               <button class="btn btn-sm rounded-pill px-3 fw-bold" :class="storageLeftMode === 'text' ? 'btn-primary' : 'btn-light text-secondary'" @click="storageLeftMode = 'text'">Текст</button>
             </div>
-            
+
             <select v-if="storageLeftMode === 'text'" v-model="selectedLanguage" class="form-select form-select-sm w-auto shadow-sm rounded-pill px-3 py-1 border-primary border-opacity-25 fw-bold text-primary" style="height: 34px;">
               <option value="python">Python (.py)</option>
               <option value="csharp">C# (.cs)</option>
@@ -549,7 +570,7 @@ const resendEmail = async () => {
               <option value="php">PHP (.php)</option>
             </select>
           </div>
-          
+
           <div v-if="storageLeftMode === 'file'" class="card h-100 border-0 shadow-lg rounded-4 overflow-hidden position-relative flex-grow-1"
             :class="isDragging1 ? 'bg-primary bg-opacity-10 border border-2 border-primary' : 'bg-white'"
             @dragover.prevent="isDragging1 = true" @dragleave.prevent="isDragging1 = false" @drop.prevent="(e) => handleDrop(e, 1)">
@@ -602,7 +623,7 @@ const resendEmail = async () => {
 
         <div class="col-md-5 d-flex flex-column">
           <div class="d-none d-md-block mb-3" style="height: 38px;"></div>
-          
+
           <div class="card h-100 border-0 shadow-lg rounded-4 overflow-hidden bg-white flex-grow-1">
             <div class="card-body p-0 d-flex flex-column h-100">
               <div class="p-3 border-bottom bg-light d-flex justify-content-between align-items-center">
@@ -624,12 +645,12 @@ const resendEmail = async () => {
                   <p class="small">Ваше сховище порожнє.</p>
                 </div>
                 <div v-else>
-                  <FileTreeItem 
-                    v-for="node in rootNodes" 
-                    :key="node.id" 
-                    :node="node" 
-                    :selected-ids="selectedStorageIds" 
-                    @toggle-selection="toggleStorageSelection" 
+                  <FileTreeItem
+                    v-for="node in rootNodes"
+                    :key="node.id"
+                    :node="node"
+                    :selected-ids="selectedStorageIds"
+                    @toggle-selection="toggleStorageSelection"
                   />
                 </div>
               </div>
@@ -683,8 +704,8 @@ const resendEmail = async () => {
                   <button
                     class="btn btn-light btn-lg w-100 rounded-pill shadow fw-bold text-primary py-3"
                     @click="startComparison"
-                    :disabled="isLoading || 
-                      (inputMode === 'file' && (!file1 || !file2)) || 
+                    :disabled="isLoading ||
+                      (inputMode === 'file' && (!file1 || !file2)) ||
                       (inputMode === 'text' && (!code1 || !code2)) ||
                       (inputMode === 'storage' && ((storageLeftMode === 'file' && !file1) || (storageLeftMode === 'text' && !code1) || selectedStorageIds.length === 0))"
                   >

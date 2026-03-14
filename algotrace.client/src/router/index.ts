@@ -15,6 +15,11 @@ const router = createRouter({
       component: () => import('../components/AuthView.vue')
     },
     {
+      path: '/analyzer',
+      name: 'analyzer',
+      component: () => import('../components/AnalyzerView.vue')
+    },
+    {
       path: '/storage',
       name: 'storage',
       component: () => import('../components/StorageView.vue'),
