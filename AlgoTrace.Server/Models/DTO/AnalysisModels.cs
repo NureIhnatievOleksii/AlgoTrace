@@ -1,4 +1,4 @@
-﻿﻿﻿﻿using System.Text.Json.Serialization;
+﻿using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
@@ -68,10 +68,13 @@ namespace AlgoTrace.Server.Models.DTO
     {
         [JsonPropertyName("file_a")]
         public string FileA { get; set; } = "";
+
         [JsonPropertyName("file_b")]
         public string FileB { get; set; } = "";
+
         [JsonPropertyName("name_a")]
         public string NameA { get; set; } = "";
+
         [JsonPropertyName("name_b")]
         public string NameB { get; set; } = "";
     }

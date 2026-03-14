@@ -2,32 +2,132 @@
 import { computed, onMounted, ref, shallowRef, watch, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import { analysisState } from '@/services/analysis.service';
+import type { editor } from 'monaco-editor';
 import InteractiveGraph from './InteractiveGraph.vue';
-import { VueMonacoEditor } from '@guolao/vue-monaco-editor';
+import { VueMonacoEditor, type Monaco } from '@guolao/vue-monaco-editor';
 import { use } from 'echarts/core';
 import { RadarChart } from 'echarts/charts';
 import { TitleComponent, TooltipComponent, LegendComponent } from 'echarts/components';
 import { CanvasRenderer } from 'echarts/renderers';
 import VChart from 'vue-echarts';
+import type { Node as VisNode, Edge as VisEdge } from 'vis-network';
+
+// --- Data Interfaces ---
+interface MatchedBlock {
+  start_line_a: number;
+  end_line_a: number;
+  start_line_b: number;
+  end_line_b: number;
+  content_a: string;
+  content_b: string;
+  file_a?: string;
+  file_b?: string;
+}
+
+interface MatchedHash {
+  hash_value: string;
+  token_sequence: string;
+  occurrences: { submission: 'a' | 'b' }[];
+}
+
+interface ASTMatch {
+  type: string;
+  severity: string;
+  leftLines: number[];
+  rightLines: number[];
+}
+
+interface ASTNode {
+  id: string;
+  label: string;
+  children?: string[];
+}
+
+interface SubtreeMatch {
+  node_type: string;
+  nodes_a: ASTNode[];
+  nodes_b: ASTNode[];
+}
+
+interface GraphMatch {
+  type: string;
+  severity: string;
+  left_lines: number[];
+  right_lines: number[];
+}
+
+interface CFGNode {
+  id: string;
+  line: number;
+  content: string;
+  type: string;
+}
+
+interface CFGEdge {
+  source: string;
+  target: string;
+  type?: string;
+}
+
+interface CFGGraph {
+  nodes: CFGNode[];
+  edges: CFGEdge[];
+}
+
+type Evidence =
+  | { matched_blocks: MatchedBlock[] }
+  | { matched_hashes: MatchedHash[] }
+  | ASTMatch[]
+  | { matched_subtrees: SubtreeMatch[] }
+  | { matches: GraphMatch[]; graph_a: CFGGraph; graph_b: CFGGraph }
+  | { metrics_a: Record<string, number>; metrics_b: Record<string, number>; conclusion?: string };
+
+interface Algorithm {
+  method: string;
+  similarity_score: number;
+  evidence_type: 'text_highlight' | 'token_sequence' | 'ast_tree_mapping' | 'graph_mapping' | 'metric_comparison';
+  evidence: Evidence;
+}
+
+interface Category {
+  category_name: string;
+  category_similarity_score: number;
+  algorithms: Algorithm[];
+}
+
+interface SourceFiles {
+  name_a: string;
+  file_a: string;
+  name_b: string;
+  file_b: string;
+}
+
+interface Report {
+  analysis_id: string;
+  global_similarity_score: number;
+  categories_results: Category[];
+  source_files: SourceFiles;
+  language: string;
+}
 
 use([TitleComponent, TooltipComponent, LegendComponent, RadarChart, CanvasRenderer]);
 
 const router = useRouter();
 const activeCategory = ref<string | null>(null);
-const activeAlgorithm = ref<any>(null);
+const activeAlgorithm = ref<Algorithm | null>(null);
 
 onMounted(() => {
   if (!analysisState.currentReport) {
     router.push('/');
     return;
   }
-  const rep = analysisState.currentReport as any;
+  const rep = analysisState.currentReport as Report;
   if (rep.categories_results && rep.categories_results.length > 0) {
     selectCategory(rep.categories_results[0]);
   }
 });
 
-const report = computed<any>(() => analysisState.currentReport);
+const report = computed<Report | null>(() => analysisState.currentReport as Report | null);
 
 const globalScore = computed(() => {
   return report.value?.global_similarity_score ? Math.round(report.value.global_similarity_score * 100) : 0;
@@ -58,7 +158,7 @@ const formatCategoryName = (name: string) => {
   return map[name] || name;
 };
 
-const selectCategory = (cat: any) => {
+const selectCategory = (cat: Category) => {
   activeCategory.value = cat.category_name;
   if (cat.algorithms && cat.algorithms.length > 0) {
     activeAlgorithm.value = cat.algorithms[0];
@@ -67,15 +167,15 @@ const selectCategory = (cat: any) => {
   }
 };
 
-const selectAlgorithm = (cat: any, algo: any) => {
+const selectAlgorithm = (cat: Category, algo: Algorithm) => {
   activeCategory.value = cat.category_name;
   activeAlgorithm.value = algo;
 };
 
-const aggregateMatches = (matches: any[]) => {
+const aggregateMatches = (matches: (ASTMatch | GraphMatch)[]) => {
   if (!matches || !Array.isArray(matches)) return [];
   const counts: Record<string, { type: string, severity: string, count: number }> = {};
-  matches.forEach(m => {
+  matches.forEach((m) => {
     const key = m.type + '_' + m.severity;
     if (!counts[key]) counts[key] = { type: m.type, severity: m.severity, count: 0 };
     counts[key].count++;
@@ -104,33 +204,33 @@ const getLinesContent = (code: string | undefined, lines: number[] | undefined, 
 // --- ИНТЕГРАЦИЯ MONACO EDITOR ---
 const editorRefA = shallowRef();
 const editorRefB = shallowRef();
-let monacoInstance: any = null;
-let decorationsCollectionA: any = null;
-let decorationsCollectionB: any = null;
+let monacoInstance: Monaco | null = null;
+let decorationsCollectionA: editor.IEditorDecorationsCollection | null = null;
+let decorationsCollectionB: editor.IEditorDecorationsCollection | null = null;
 
-const handleEditorMount = (editor: any, monaco: any, fileId: 'a' | 'b') => {
+const handleEditorMount = (editor: editor.IStandaloneCodeEditor, monaco: Monaco, fileId: 'a' | 'b') => {
   if (fileId === 'a') editorRefA.value = editor;
   else editorRefB.value = editor;
   monacoInstance = monaco;
   updateMonacoDecorations();
 };
 
-const getHighlightedLines = (fileId: 'a' | 'b', evidenceType: string, evidenceData: any) => {
+const getHighlightedLines = (fileId: 'a' | 'b', evidenceType: string, evidenceData: Evidence | undefined) => {
   const lines = new Set<number>();
   if (!evidenceData) return [];
-    if (evidenceType === 'text_highlight' && evidenceData?.matched_blocks) {
-      evidenceData.matched_blocks.forEach((match: any) => {
+    if (evidenceType === 'text_highlight' && 'matched_blocks' in evidenceData) {
+      (evidenceData as { matched_blocks: MatchedBlock[] }).matched_blocks.forEach((match: MatchedBlock) => {
         const start = fileId === 'a' ? match.start_line_a : match.start_line_b;
         const end = fileId === 'a' ? match.end_line_a : match.end_line_b;
       for (let i = start; i <= end; i++) lines.add(i);
       });
-    } else if (evidenceType === 'graph_mapping' && evidenceData?.matches) {
-       evidenceData.matches.forEach((match: any) => {
+    } else if (evidenceType === 'graph_mapping' && 'matches' in evidenceData) {
+       (evidenceData as { matches: GraphMatch[] }).matches.forEach((match: GraphMatch) => {
          const matchLines = fileId === 'a' ? match.left_lines : match.right_lines;
        if (matchLines && Array.isArray(matchLines)) matchLines.forEach((l: number) => lines.add(l));
        });
     } else if (evidenceType === 'ast_tree_mapping' && Array.isArray(evidenceData)) {
-       evidenceData.forEach((match: any) => {
+       (evidenceData as ASTMatch[]).forEach((match: ASTMatch) => {
          const matchLines = fileId === 'a' ? match.leftLines : match.rightLines;
          if (matchLines && Array.isArray(matchLines)) {
            if (matchLines.length === 2 && matchLines[0] !== matchLines[1]) {
@@ -166,30 +266,30 @@ const updateMonacoDecorations = () => {
 watch(activeAlgorithm, () => nextTick(updateMonacoDecorations));
 
 // --- ИНТЕГРАЦИЯ VIS-NETWORK ---
-const buildASTVisData = (nodes: any[]) => {
-  const visNodes: any[] = [];
-  const visEdges: any[] = [];
+const buildASTVisData = (nodes: ASTNode[]): { nodes: VisNode[], edges: VisEdge[] } => {
+  const visNodes: VisNode[] = [];
+  const visEdges: VisEdge[] = [];
   if (!nodes) return { nodes: visNodes, edges: visEdges };
-  nodes.forEach((n: any) => {
+  nodes.forEach((n: ASTNode) => {
     visNodes.push({ id: n.id, label: (n.label || '').replace(/[\[\]{}()<>]/g, ' ') });
     if (n.children && Array.isArray(n.children)) {
-      n.children.forEach((cId: any) => visEdges.push({ from: n.id, to: cId }));
+      n.children.forEach((cId: string) => visEdges.push({ from: n.id, to: cId }));
     }
   });
   return { nodes: visNodes, edges: visEdges };
 };
 
-const buildCFGVisData = (graph: any) => {
-  const visNodes: any[] = [];
-  const visEdges: any[] = [];
+const buildCFGVisData = (graph: CFGGraph): { nodes: VisNode[], edges: VisEdge[] } => {
+  const visNodes: VisNode[] = [];
+  const visEdges: VisEdge[] = [];
   if (!graph || !graph.nodes) return { nodes: visNodes, edges: visEdges };
-  graph.nodes.forEach((n: any) => {
+  graph.nodes.forEach((n: CFGNode) => {
     let content = (n.content || '').replace(/["\\]/g, "'").replace(/[\[\]{}()<>]/g, ' ');
     if (content.length > 40) content = content.substring(0, 40) + '...';
     visNodes.push({ id: n.id, label: `[L${n.line}]\n${content}`, group: n.type });
   });
   if (graph.edges && Array.isArray(graph.edges)) {
-    graph.edges.forEach((e: any) => visEdges.push({ from: e.source, to: e.target, label: e.type || '' }));
+    graph.edges.forEach((e: CFGEdge) => visEdges.push({ from: e.source, to: e.target, label: e.type || '' }));
   }
   return { nodes: visNodes, edges: visEdges };
 };
@@ -198,7 +298,8 @@ const buildCFGVisData = (graph: any) => {
 const metricsChartOption = computed(() => {
   if (activeAlgorithm.value?.evidence_type !== 'metric_comparison') return null;
   const ev = activeAlgorithm.value.evidence;
-  const keys = Object.keys(ev.metrics_a || {});
+  if (!('metrics_a' in ev) || !('metrics_b' in ev)) return null;
+  const keys = Object.keys(ev.metrics_a);
   if (keys.length === 0) return null;
   const maxValues = keys.map(k => Math.max(ev.metrics_a[k] || 0, ev.metrics_b[k] || 0) * 1.2 || 10);
 
@@ -450,13 +551,13 @@ const metricsChartOption = computed(() => {
                                 <span class="fw-medium text-dark font-monospace small">{{ hash.token_sequence }}</span>
                               </td>
                               <td class="py-3 px-4 text-center">
-                                 <span v-if="hash.occurrences.find((o: any) => o.submission === 'a')" class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-50 px-3 py-2 rounded-pill">
+                                 <span v-if="hash.occurrences.find((o) => o.submission === 'a')" class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-50 px-3 py-2 rounded-pill">
                                     Знайдено
                                  </span>
                                  <span v-else class="text-muted">-</span>
                               </td>
                               <td class="py-3 px-4 text-center">
-                                 <span v-if="hash.occurrences.find((o: any) => o.submission === 'b')" class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-50 px-3 py-2 rounded-pill">
+                                 <span v-if="hash.occurrences.find((o) => o.submission === 'b')" class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-50 px-3 py-2 rounded-pill">
                                     Знайдено
                                  </span>
                                  <span v-else class="text-muted">-</span>

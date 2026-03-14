@@ -1,7 +1,7 @@
-﻿﻿using AlgoTrace.Server.Interfaces;
+﻿using System;
+using AlgoTrace.Server.Interfaces;
 using AlgoTrace.Server.Models.DTO;
 using AlgoTrace.Server.Utils;
-using System;
 
 namespace AlgoTrace.Server.Algorithms.Textual
 {
@@ -62,7 +62,7 @@ namespace AlgoTrace.Server.Algorithms.Textual
                     if (tNorm.Length < 10 || tNorm.Length > MaxLineLength)
                         continue;
 
-                    // Quick heuristic: length difference must be within 15% 
+                    // Quick heuristic: length difference must be within 15%
                     // for the ratio to possibly be > 0.85
                     int maxLen = Math.Max(sNorm.Length, tNorm.Length);
                     if (Math.Abs(sNorm.Length - tNorm.Length) > maxLen * 0.15)
@@ -98,8 +98,10 @@ namespace AlgoTrace.Server.Algorithms.Textual
             int n = s.Length;
             int m = t.Length;
 
-            if (n == 0) return m;
-            if (m == 0) return n;
+            if (n == 0)
+                return m;
+            if (m == 0)
+                return n;
 
             // Space optimization: Use 2 rows instead of an N*M matrix
             int[] v0 = new int[m + 1];
@@ -117,10 +119,7 @@ namespace AlgoTrace.Server.Algorithms.Textual
                 for (int j = 0; j < m; j++)
                 {
                     int cost = (s[i] == t[j]) ? 0 : 1;
-                    v1[j + 1] = Math.Min(
-                        Math.Min(v1[j] + 1, v0[j + 1] + 1),
-                        v0[j] + cost
-                    );
+                    v1[j + 1] = Math.Min(Math.Min(v1[j] + 1, v0[j + 1] + 1), v0[j] + cost);
                 }
 
                 // Swap vectors to reuse memory for the next outer iteration

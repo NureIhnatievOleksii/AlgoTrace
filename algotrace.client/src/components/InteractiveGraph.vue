@@ -1,10 +1,15 @@
 <script setup lang="ts">
 import { ref, onMounted, watch, onBeforeUnmount } from 'vue';
-import { Network } from 'vis-network';
+import { Network, type Node, type Edge, type Options } from 'vis-network';
+
+interface GraphData {
+  nodes: Node[];
+  edges: Edge[];
+}
 
 const props = defineProps<{
-  graphData: { nodes: any[]; edges: any[] };
-  options?: any;
+  graphData: GraphData;
+  options?: Options;
 }>();
 
 const container = ref<HTMLElement | null>(null);
