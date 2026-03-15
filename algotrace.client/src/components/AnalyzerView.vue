@@ -449,7 +449,6 @@ const metricsChartOption = computed(() => {
     tooltip: { trigger: 'item' },
     legend: { data: ['Файл 1', 'Файл 2'], textStyle: { color: isDarkMode.value ? '#e0e0e0' : '#495057' }, bottom: 0 },
     radar: {
-      indicator: keys.map((k, i) => ({ name: k.replace(/_/g, ' '), max: maxValues[i] })),
       indicator: keys.map((k, i) => ({ name: formatMetricKey(k), max: maxValues[i] })),
       splitArea: { areaStyle: { color: isDarkMode.value ? ['rgba(255,255,255,0.02)', 'rgba(255,255,255,0.05)'] : ['rgba(0,0,0,0.02)', 'rgba(0,0,0,0.05)'] } },
       splitLine: { lineStyle: { color: isDarkMode.value ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' } },
