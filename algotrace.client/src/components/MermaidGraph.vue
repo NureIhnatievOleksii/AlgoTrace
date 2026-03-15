@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, watch, nextTick } from 'vue';
 import mermaid from 'mermaid';
-import { isDarkMode } from './useTheme';
+import { isDarkMode } from '../composables/useTheme';
 
 const props = defineProps<{
   definition: string;

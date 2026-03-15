@@ -2,7 +2,7 @@
 import { authService } from '@/services/auth.service';
 import { ref, reactive } from 'vue';
 import { useRouter } from 'vue-router';
-import { isDarkMode, toggleTheme } from './useTheme';
+import { isDarkMode, toggleTheme } from '../composables/useTheme';
 
 const router = useRouter();
 const isLogin = ref(true);

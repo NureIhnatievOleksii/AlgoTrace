@@ -3,7 +3,7 @@ import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { authState, authService } from '@/services/auth.service';
 import api from '@/services/api';
-import { isDarkMode, toggleTheme } from './useTheme';
+import { isDarkMode, toggleTheme } from '../composables/useTheme';
 
 interface FileEntry {
   fileId: string;

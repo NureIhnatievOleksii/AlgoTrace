@@ -3,7 +3,7 @@ import { ref, watch, computed, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { authService, authState } from '../services/auth.service';
 import { analysisService, analysisState, type AnalysisPayload, type AnalysisMultiplePayload, type FileContent } from '../services/analysis.service';
-import { isDarkMode, toggleTheme } from './useTheme';
+import { isDarkMode, toggleTheme } from '../composables/useTheme';
 import api from '../services/api';
 import FileTreeItem, { type Node } from '@/components/FileTreeItem.vue';
 

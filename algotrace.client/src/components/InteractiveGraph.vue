@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, watch, onBeforeUnmount } from 'vue';
 import { Network, type Node, type Edge, type Options } from 'vis-network';
-import { isDarkMode } from './useTheme';
+import { isDarkMode } from '../composables/useTheme';
 
 interface GraphData {
   nodes: Node[];

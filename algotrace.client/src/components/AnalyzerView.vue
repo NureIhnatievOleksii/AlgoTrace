@@ -12,7 +12,7 @@ import { TitleComponent, TooltipComponent, LegendComponent } from 'echarts/compo
 import { CanvasRenderer } from 'echarts/renderers';
 import VChart from 'vue-echarts';
 import type { Node as VisNode, Edge as VisEdge } from 'vis-network';
-import { isDarkMode, toggleTheme } from './useTheme';
+import { isDarkMode, toggleTheme } from '../composables/useTheme';
 
 interface MatchedBlock {
   start_line_a: number;
@@ -118,6 +118,23 @@ interface Report {
   error?: string | null;
 }
 
+interface DocumentComparisonResult {
+  document_id?: string;
+  target_file?: { filename: string; content: string };
+  global_similarity_score: number;
+  categories_results?: Category[];
+  error?: string | null;
+}
+
+interface MultiReport {
+  analysis_id: string;
+  main_submission?: { filename: string; content: string };
+  results: DocumentComparisonResult[];
+  language?: string;
+}
+
+type RawReport = Report | MultiReport;
+
 use([TitleComponent, TooltipComponent, LegendComponent, RadarChart, CanvasRenderer]);
 
 const router = useRouter();
@@ -125,13 +142,13 @@ const activeCategory = ref<string | null>(null);
 const activeAlgorithm = ref<Algorithm | null>(null);
 
 const isMultiReport = computed(() => {
-  const raw = analysisState.currentReport as any;
-  return raw && raw.results && Array.isArray(raw.results);
+  const raw = analysisState.currentReport as unknown as RawReport | null;
+  return raw && 'results' in raw && Array.isArray(raw.results);
 });
 
 const multiResults = computed(() => {
   if (isMultiReport.value) {
-    return (analysisState.currentReport as any).results;
+    return (analysisState.currentReport as unknown as MultiReport).results;
   }
   return [];
 });
@@ -139,23 +156,24 @@ const multiResults = computed(() => {
 const selectedResultIndex = ref(0);
 
 const report = computed<Report | null>(() => {
-  const raw = analysisState.currentReport as any;
+  const raw = analysisState.currentReport as unknown as RawReport | null;
   if (!raw) return null;
 
   if (isMultiReport.value) {
-    const result = raw.results[selectedResultIndex.value];
+    const multiRaw = raw as MultiReport;
+    const result = multiRaw.results[selectedResultIndex.value];
     if (!result) return null;
     return {
-      analysis_id: raw.analysis_id,
+      analysis_id: multiRaw.analysis_id,
       global_similarity_score: result.global_similarity_score,
       categories_results: result.categories_results || [],
       source_files: {
-        name_a: raw.main_submission?.filename || 'Файл 1',
-        file_a: raw.main_submission?.content || '',
+        name_a: multiRaw.main_submission?.filename || 'Файл 1',
+        file_a: multiRaw.main_submission?.content || '',
         name_b: result.target_file?.filename || 'Файл 2',
         file_b: result.target_file?.content || ''
       },
-      language: raw.language || 'python',
+      language: multiRaw.language || 'python',
       error: result.error || null
     } as Report;
   }

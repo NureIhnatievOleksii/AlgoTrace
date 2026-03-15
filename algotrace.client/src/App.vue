@@ -2,7 +2,6 @@
 import { onMounted } from 'vue';
 import { RouterView } from 'vue-router';
 import { authService } from './services/auth.service';
-import { isDarkMode } from './composables/useTheme';
 
 onMounted(() => {
   authService.init();
