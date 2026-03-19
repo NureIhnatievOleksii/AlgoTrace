@@ -5,26 +5,12 @@
 [![Forks][forks-shield]][forks-url]
 [![Stargazers][stars-shield]][stars-url]
 [![Issues][issues-shield]][issues-url]
-[![MIT License][license-shield]][license-url]
 [![LinkedIn][linkedin-shield]][linkedin-url]
 
 <!-- PROJECT LOGO -->
 <br />
 <div align="center">
   <h3 align="center">AlgoTrace</h3>
-
-  <p align="center">
-    A web application for anti-plagiarism checking of source code based on multi-level analysis.
-    <br />
-    <a href="https://github.com/your_username/AlgoTrace"><strong>Explore the docs »</strong></a>
-    <br />
-    <br />
-    <a href="https://github.com/your_username/AlgoTrace">View Demo</a>
-    ·
-    <a href="https://github.com/your_username/AlgoTrace/issues/new?labels=bug&template=bug-report---.md">Report Bug</a>
-    ·
-    <a href="https://github.com/your_username/AlgoTrace/issues/new?labels=enhancement&template=feature-request---.md">Request Feature</a>
-  </p>
 </div>
 
 <!-- TABLE OF CONTENTS -->
@@ -41,7 +27,6 @@
     <li>
       <a href="#getting-started">Getting Started</a>
       <ul>
-        <li><a href="#system-requirements">System Requirements</a></li>
         <li><a href="#prerequisites">Prerequisites</a></li>
         <li><a href="#installation-&-launch">Installation & Launch</a></li>
       </ul>
@@ -49,7 +34,6 @@
     <li><a href="#usage">Usage</a></li>
     <li><a href="#roadmap">Roadmap</a></li>
     <li><a href="#contributing">Contributing</a></li>
-    <li><a href="#license">License</a></li>
     <li><a href="#contact">Contact</a></li>
   </ol>
 </details>
@@ -81,14 +65,6 @@ AlgoTrace is a comprehensive web application designed to detect source code plag
 
 Follow these instructions to get a local copy of the project up and running.
 
-### System Requirements
-
-To run this project smoothly, your machine should meet the following minimum requirements:
-* **OS:** Windows 10/11, macOS, or a modern Linux distribution
-* **RAM:** Minimum 4 GB (8 GB recommended for analyzing large codebases)
-* **Storage:** At least 2 GB of free disk space for Docker images and database storage
-* **CPU:** Dual-core processor or higher
-
 ### Prerequisites
 
 You will need to have Docker installed on your machine to build and run the containers.
@@ -99,7 +75,7 @@ You will need to have Docker installed on your machine to build and run the cont
 
 1. Clone the repository
    ```sh
-   git clone https://github.com/your_username/AlgoTrace.git
+   git clone https://github.com/OleksiiIhnatiev/AlgoTrace.git
    ```
 2. Navigate to the project directory
    ```sh
@@ -152,12 +128,11 @@ Contributions are what make the open source community such an amazing place to l
 4. Push to the Branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
 
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
+<a href="https://github.com/OleksiiIhnatiev/AlgoTrace/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=OleksiiIhnatiev/AlgoTrace" />
+</a>
 
-<!-- LICENSE -->
-## License
-
-Distributed under the MIT License. See `LICENSE.txt` for more information.
+Made with contrib.rocks.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -166,23 +141,21 @@ Distributed under the MIT License. See `LICENSE.txt` for more information.
 
 Your Name - @your_twitter - email@example.com
 
-Project Link: https://github.com/your_username/AlgoTrace
+Project Link: https://github.com/OleksiiIhnatiev/AlgoTrace
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 <!-- MARKDOWN LINKS & IMAGES -->
-[contributors-shield]: https://img.shields.io/github/contributors/your_username/AlgoTrace.svg?style=for-the-badge
-[contributors-url]: https://github.com/your_username/AlgoTrace/graphs/contributors
-[forks-shield]: https://img.shields.io/github/forks/your_username/AlgoTrace.svg?style=for-the-badge
-[forks-url]: https://github.com/your_username/AlgoTrace/network/members
-[stars-shield]: https://img.shields.io/github/stars/your_username/AlgoTrace.svg?style=for-the-badge
-[stars-url]: https://github.com/your_username/AlgoTrace/stargazers
-[issues-shield]: https://img.shields.io/github/issues/your_username/AlgoTrace.svg?style=for-the-badge
-[issues-url]: https://github.com/your_username/AlgoTrace/issues
-[license-shield]: https://img.shields.io/github/license/your_username/AlgoTrace.svg?style=for-the-badge
-[license-url]: https://github.com/your_username/AlgoTrace/blob/master/LICENSE.txt
+[contributors-shield]: https://img.shields.io/github/contributors/OleksiiIhnatiev/AlgoTrace.svg?style=for-the-badge
+[contributors-url]: https://github.com/OleksiiIhnatiev/AlgoTrace/graphs/contributors
+[forks-shield]: https://img.shields.io/github/forks/OleksiiIhnatiev/AlgoTrace.svg?style=for-the-badge
+[forks-url]: https://github.com/OleksiiIhnatiev/AlgoTrace/network/members
+[stars-shield]: https://img.shields.io/github/stars/OleksiiIhnatiev/AlgoTrace.svg?style=for-the-badge
+[stars-url]: https://github.com/OleksiiIhnatiev/AlgoTrace/stargazers
+[issues-shield]: https://img.shields.io/github/issues/OleksiiIhnatiev/AlgoTrace.svg?style=for-the-badge
+[issues-url]: https://github.com/OleksiiIhnatiev/AlgoTrace/issues
 [linkedin-shield]: https://img.shields.io/badge/-LinkedIn-black.svg?style=for-the-badge&logo=linkedin&colorB=555
-[linkedin-url]: https://linkedin.com/in/your_username
+[linkedin-url]: https://linkedin.com/in/OleksiiIhnatiev
 [Vue.js]: https://img.shields.io/badge/Vue.js-35495E?style=for-the-badge&logo=vuedotjs&logoColor=4FC08D
 [Vue-url]: https://vuejs.org/
 [Dotnet-shield]: https://img.shields.io/badge/.NET-5C2D91?style=for-the-badge&logo=.net&logoColor=white

@@ -56,7 +56,7 @@ onMounted(() => {
 });
 
 const report = computed<Report | null>(() => {
-  const raw = analysisState.currentReport as RawReport;
+  const raw = analysisState.currentReport as unknown as RawReport | null;
   if (!raw) return null;
 
   const isMulti = raw && 'results' in raw && Array.isArray(raw.results);
