@@ -162,7 +162,7 @@ const detectLanguage = (code: string): string | null => {
   if (c.includes('import react') || c.includes('from \'react\'') || c.includes('classname=')) return 'javascript';
   if (c.includes('function ') || c.includes('const ') || c.includes('let ') || c.includes('console.log')) return 'javascript';
   if (c.trim().startsWith('{') && c.trim().endsWith('}')) {
-    try { JSON.parse(code); return 'json'; } catch(e) {}
+    try { JSON.parse(code); return 'json'; } catch {}
   }
   return null;
 };

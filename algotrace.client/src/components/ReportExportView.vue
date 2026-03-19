@@ -4,7 +4,6 @@ import { analysisState } from '@/services/analysis.service';
 import { computed, onMounted, ref, nextTick } from 'vue';
 import InteractiveGraph from './InteractiveGraph.vue';
 import type { Node as VisNode, Edge as VisEdge } from 'vis-network';
-// @ts-ignore (Ігноруємо відсутність типів, якщо вони не встановлені)
 import html2pdf from 'html2pdf.js';
 
 // Дублюємо основні інтерфейси для типізації
@@ -22,7 +21,15 @@ interface Algorithm { method: string; similarity_score: number; evidence_type: s
 interface Category { category_name: string; category_similarity_score: number; algorithms: Algorithm[]; }
 interface SourceFiles { name_a: string; file_a: string; name_b: string; file_b: string; }
 interface Report { analysis_id: string; global_similarity_score: number; categories_results: Category[]; source_files: SourceFiles; language: string; }
-interface MultiReport { analysis_id: string; main_submission?: { filename: string; content: string }; results: any[]; language?: string; }
+interface RawReport {
+  analysis_id: string;
+  language?: string;
+  global_similarity_score?: number;
+  categories_results?: Category[];
+  source_files?: SourceFiles;
+  main_submission?: { filename: string; content: string };
+  results?: Array<{ global_similarity_score: number; categories_results: Category[]; target_file?: { filename: string; content: string } }>;
+}
 
 const props = defineProps<{
   hiddenRender?: boolean;
@@ -49,7 +56,7 @@ onMounted(() => {
 });
 
 const report = computed<Report | null>(() => {
-  const raw = analysisState.currentReport as any;
+  const raw = analysisState.currentReport as RawReport;
   if (!raw) return null;
 
   const isMulti = raw && 'results' in raw && Array.isArray(raw.results);
@@ -57,7 +64,7 @@ const report = computed<Report | null>(() => {
 
   let baseReport: Report;
   if (isMulti) {
-    const result = raw.results[resultIdx];
+    const result = raw.results![resultIdx];
     if (!result) return null;
     baseReport = {
       analysis_id: raw.analysis_id,
@@ -72,7 +79,7 @@ const report = computed<Report | null>(() => {
       language: raw.language || 'python'
     };
   } else {
-    baseReport = raw as Report;
+    baseReport = raw as unknown as Report;
   }
 
   const selectedMethods = props.methods !== undefined ? props.methods : (route.query.methods ? (route.query.methods as string).split(',') : []);
