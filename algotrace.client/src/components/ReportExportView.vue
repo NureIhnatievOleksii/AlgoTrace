@@ -6,7 +6,6 @@ import InteractiveGraph from './InteractiveGraph.vue';
 import type { Node as VisNode, Edge as VisEdge } from 'vis-network';
 import html2pdf from 'html2pdf.js';
 
-// Дублюємо основні інтерфейси для типізації
 interface MatchedBlock { start_line_a: number; end_line_a: number; start_line_b: number; end_line_b: number; content_a: string; content_b: string; file_a?: string; file_b?: string; }
 interface MatchedHash { hash_value: string; token_sequence: string; occurrences: { submission: 'a' | 'b' }[]; }
 interface ASTMatch { type: string; severity: string; leftLines: number[]; rightLines: number[]; }
@@ -188,7 +187,7 @@ const buildCFGVisData = (graph: CFGGraph | undefined): { nodes: VisNode[], edges
 };
 
 const printGraphOptions = {
-  autoResize: true, // Повертаємо авто-масштабування, щоб граф підлаштовувався під розмір аркуша
+  autoResize: true,
   interaction: {
     dragNodes: false,
     dragView: false,
@@ -224,17 +223,16 @@ const downloadPdf = async () => {
   isGenerating.value = true;
 
   if (!props.hiddenRender) {
-    // Примусовий скрол вгору. Без цього html2canvas часто фіксує білу область.
     window.scrollTo(0, 0);
   }
-  await new Promise(resolve => setTimeout(resolve, 1500)); // Даємо більше часу на стабілізацію та відмальовку графіків
+  await new Promise(resolve => setTimeout(resolve, 1500));
 
   try {
     const opt = {
-      margin:       [10, 0, 10, 0], // Відступи: верх, право, низ, ліво
+      margin:       [10, 0, 10, 0] as [number, number, number, number],
       filename:     `AlgoTrace_Report_${report.value.analysis_id}.pdf`,
       image:        { type: 'jpeg', quality: 0.98 },
-      html2canvas:  { scale: 1.2, useCORS: true, scrollY: 0, backgroundColor: '#ffffff' }, // Прибрали windowWidth, щоб не обрізало по краях
+      html2canvas:  { scale: 1.2, useCORS: true, scrollY: 0, backgroundColor: '#ffffff' },
       jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
       pagebreak:    { mode: ['css', 'legacy'], avoid: '.avoid-break' }
     };

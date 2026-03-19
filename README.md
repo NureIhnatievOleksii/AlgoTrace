@@ -2,8 +2,6 @@
 
 <!-- PROJECT SHIELDS -->
 [![Contributors][contributors-shield]][contributors-url]
-[![Forks][forks-shield]][forks-url]
-[![Stargazers][stars-shield]][stars-url]
 [![Issues][issues-shield]][issues-url]
 [![LinkedIn][linkedin-shield]][linkedin-url]
 
@@ -132,7 +130,6 @@ Contributions are what make the open source community such an amazing place to l
   <img src="https://contrib.rocks/image?repo=OleksiiIhnatiev/AlgoTrace" />
 </a>
 
-Made with contrib.rocks.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -149,13 +146,11 @@ Project Link: https://github.com/OleksiiIhnatiev/AlgoTrace
 [contributors-shield]: https://img.shields.io/github/contributors/OleksiiIhnatiev/AlgoTrace.svg?style=for-the-badge
 [contributors-url]: https://github.com/OleksiiIhnatiev/AlgoTrace/graphs/contributors
 [forks-shield]: https://img.shields.io/github/forks/OleksiiIhnatiev/AlgoTrace.svg?style=for-the-badge
-[forks-url]: https://github.com/OleksiiIhnatiev/AlgoTrace/network/members
 [stars-shield]: https://img.shields.io/github/stars/OleksiiIhnatiev/AlgoTrace.svg?style=for-the-badge
-[stars-url]: https://github.com/OleksiiIhnatiev/AlgoTrace/stargazers
 [issues-shield]: https://img.shields.io/github/issues/OleksiiIhnatiev/AlgoTrace.svg?style=for-the-badge
 [issues-url]: https://github.com/OleksiiIhnatiev/AlgoTrace/issues
 [linkedin-shield]: https://img.shields.io/badge/-LinkedIn-black.svg?style=for-the-badge&logo=linkedin&colorB=555
-[linkedin-url]: https://linkedin.com/in/OleksiiIhnatiev
+[linkedin-url]: https://www.linkedin.com/in/oleksii-ihnatiev-75232a329/
 [Vue.js]: https://img.shields.io/badge/Vue.js-35495E?style=for-the-badge&logo=vuedotjs&logoColor=4FC08D
 [Vue-url]: https://vuejs.org/
 [Dotnet-shield]: https://img.shields.io/badge/.NET-5C2D91?style=for-the-badge&logo=.net&logoColor=white
