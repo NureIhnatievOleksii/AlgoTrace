@@ -6,5 +6,7 @@ namespace AlgoTrace.Server.Interfaces
     {
         string Language { get; }
         UniversalNode Parse(string code);
+
+        UniversalNode Parse(string code, bool ignoreComments) => Parse(code);
     }
 }

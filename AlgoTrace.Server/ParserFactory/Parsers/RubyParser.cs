@@ -11,17 +11,33 @@ namespace AlgoTrace.Server.ParserFactory.Parsers
         public UniversalNode Parse(string code)
         {
             var root = new UniversalNode { Type = UniversalNodeType.Program, Value = "RubyScript" };
-            var lines = code.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+            var sanitizedCode = SanitizeRubyCode(code);
+            var lines = sanitizedCode.Split(
+                new[] { '\r', '\n' },
+                StringSplitOptions.RemoveEmptyEntries
+            );
 
             var stack = new Stack<UniversalNode>();
             stack.Push(root);
 
-            var blockOpeners = new[] { "class ", "module ", "def ", "if ", "unless ", "while ", "until ", "for ", "begin " };
+            var blockOpeners = new[]
+            {
+                "class ",
+                "module ",
+                "def ",
+                "if ",
+                "unless ",
+                "while ",
+                "until ",
+                "for ",
+                "begin ",
+            };
 
             foreach (var line in lines)
             {
                 string trimmed = line.Trim();
-                if (string.IsNullOrWhiteSpace(trimmed) || trimmed.StartsWith("#")) continue;
+                if (string.IsNullOrWhiteSpace(trimmed) || trimmed.StartsWith("#"))
+                    continue;
 
                 if (trimmed == "end" && stack.Count > 1)
                 {
@@ -35,12 +51,27 @@ namespace AlgoTrace.Server.ParserFactory.Parsers
 
                 if (blockOpeners.Any(op => trimmed.StartsWith(op)) || trimmed.EndsWith(" do"))
                 {
-                    var blockNode = node.Type != UniversalNodeType.Unknown ? node : new UniversalNode { Type = "Block" };
-                    if (node.Type == UniversalNodeType.Unknown) stack.Peek().Children.Add(blockNode);
+                    var blockNode =
+                        node.Type != UniversalNodeType.Unknown
+                            ? node
+                            : new UniversalNode { Type = "Block" };
+                    if (node.Type == UniversalNodeType.Unknown)
+                        stack.Peek().Children.Add(blockNode);
                     stack.Push(blockNode);
                 }
             }
             return root;
+        }
+
+        private string SanitizeRubyCode(string code)
+        {
+            var pattern = @"(""(?:\\.|[^\\""])*""|'(?:\\.|[^\\'])*'|#.*?$)";
+            return Regex.Replace(
+                code,
+                pattern,
+                match => match.Value.StartsWith("#") ? "" : "\"STR\"",
+                RegexOptions.Multiline
+            );
         }
 
         private UniversalNode IdentifyNode(string line)
@@ -57,9 +88,18 @@ namespace AlgoTrace.Server.ParserFactory.Parsers
                 node.Type = UniversalNodeType.Method;
                 node.Value = Regex.Match(line, @"def\s+([\w\.\!\?]+)").Groups[1].Value;
             }
-            else if (line.StartsWith("if ") || line.StartsWith("unless ") || line.StartsWith("elsif "))
+            else if (
+                line.StartsWith("if ")
+                || line.StartsWith("unless ")
+                || line.StartsWith("elsif ")
+            )
                 node.Type = UniversalNodeType.If;
-            else if (line.StartsWith("while ") || line.StartsWith("until ") || line.StartsWith("for ") || line.EndsWith(" do"))
+            else if (
+                line.StartsWith("while ")
+                || line.StartsWith("until ")
+                || line.StartsWith("for ")
+                || line.EndsWith(" do")
+            )
                 node.Type = UniversalNodeType.Loop;
             else if (line.Contains("=") && !line.Contains("=="))
                 node.Type = UniversalNodeType.Assignment;

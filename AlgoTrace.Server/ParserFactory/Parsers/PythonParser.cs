@@ -10,8 +10,21 @@ namespace AlgoTrace.Server.ParserFactory.Parsers
 
         public UniversalNode Parse(string code)
         {
-            var root = new UniversalNode { Type = UniversalNodeType.Program, Value = "PythonModule" };
-            var lines = code.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+            return Parse(code, true);
+        }
+
+        public UniversalNode Parse(string code, bool ignoreComments)
+        {
+            var root = new UniversalNode
+            {
+                Type = UniversalNodeType.Program,
+                Value = "PythonModule",
+            };
+            var sanitizedCode = SanitizePythonCode(code, ignoreComments);
+            var lines = sanitizedCode.Split(
+                new[] { '\r', '\n' },
+                StringSplitOptions.RemoveEmptyEntries
+            );
 
             var stack = new Stack<(int indent, UniversalNode node)>();
             stack.Push((-1, root));
@@ -41,6 +54,26 @@ namespace AlgoTrace.Server.ParserFactory.Parsers
             return root;
         }
 
+        private string SanitizePythonCode(string code, bool ignoreComments)
+        {
+            var pattern =
+                @"(""{3}[\s\S]*?""{3}|'{3}[\s\S]*?'{3}|""(?:\\.|[^\\""])*""|'(?:\\.|[^\\'])*'|#.*?$)";
+            return Regex.Replace(
+                code,
+                pattern,
+                match =>
+                {
+                    if (match.Value.StartsWith("#"))
+                        return ignoreComments ? "" : match.Value;
+
+                    // Сохраняем переносы строк для сохранения правильных отступов (indentation)
+                    int newlines = match.Value.Count(c => c == '\n');
+                    return "\"STR\"" + new string('\n', newlines);
+                },
+                RegexOptions.Multiline
+            );
+        }
+
         private UniversalNode CreateNodeFromLine(string line)
         {
             var node = new UniversalNode { Type = UniversalNodeType.Unknown, Value = "" };
@@ -67,7 +100,11 @@ namespace AlgoTrace.Server.ParserFactory.Parsers
             {
                 node.Type = UniversalNodeType.Return;
             }
-            else if (line.StartsWith("try:") || line.StartsWith("except") || line.StartsWith("finally:"))
+            else if (
+                line.StartsWith("try:")
+                || line.StartsWith("except")
+                || line.StartsWith("finally:")
+            )
             {
                 node.Type = UniversalNodeType.TryCatch;
             }
