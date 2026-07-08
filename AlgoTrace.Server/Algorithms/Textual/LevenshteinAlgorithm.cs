@@ -26,12 +26,6 @@ namespace AlgoTrace.Server.Algorithms.Textual
                 return matches;
             }
 
-            if (sLines.Length > 2500 || tLines.Length > 2500)
-            {
-                similarityScore = 0.0;
-                return matches;
-            }
-
             var sNorms = new string[sLines.Length];
             for (int i = 0; i < sLines.Length; i++)
                 sNorms[i] = SourceNormalizer.NormalizeLine(sLines[i]);
