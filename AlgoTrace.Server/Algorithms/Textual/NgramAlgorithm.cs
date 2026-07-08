@@ -93,7 +93,10 @@ namespace AlgoTrace.Server.Algorithms.Textual
             {
                 if (isLineEvaluated[i])
                 {
-                    totalScore += lineMaxScores[i];
+                    if (lineMaxScores[i] >= 0.7)
+                    {
+                        totalScore += lineMaxScores[i];
+                    }
                     evaluatedCount++;
                 }
             }

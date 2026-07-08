@@ -8,6 +8,7 @@ namespace AlgoTrace.Server.Interfaces
         Task<IEnumerable<FolderDto>> GetAllFoldersAsync(string userId);
         Task<FolderContentDto?> GetFolderContentAsync(Guid? folderId, string userId);
         Task<Folder> CreateFolderAsync(CreateFolderRequest model, string userId);
+        Task<Dictionary<string, Guid>> CreateFolderTreeAsync(CreateFolderTreeRequest model, string userId);
         Task<bool> RenameFolderAsync(Guid folderId, string newName, string userId);
         Task<bool> DeleteFolderAsync(Guid folderId, string userId);
 
