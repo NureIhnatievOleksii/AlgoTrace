@@ -44,6 +44,11 @@ interface FSDirectoryEntry extends FSEntry {
   createReader: () => FSDirectoryReader;
 }
 
+interface ScannedFile {
+  relPath: string;
+  file: File;
+}
+
 const router = useRouter();
 
 const currentFolderContent = ref<FolderContent | null>(null);
@@ -243,6 +248,31 @@ const handleFileUpload = (event: Event) => {
   }
 };
 
+const scanEntries = async (entry: FSEntry, currentPath: string, scannedFiles: ScannedFile[], scannedFolders: Set<string>) => {
+  if (entry.isFile) {
+    const file = await new Promise<File>((resolve) => (entry as FSFileEntry).file(resolve));
+    if (isValidFile(file)) {
+      scannedFiles.push({ relPath: currentPath, file });
+    }
+  } else if (entry.isDirectory) {
+    const newPath = currentPath ? `${currentPath}/${entry.name}` : entry.name;
+    scannedFolders.add(newPath);
+    const dirReader = (entry as FSDirectoryEntry).createReader();
+    
+    const readEntries = async (): Promise<FSEntry[]> => {
+      return new Promise((resolve) => dirReader.readEntries(resolve));
+    };
+    
+    let entries = await readEntries();
+    while (entries.length > 0) {
+      for (const child of entries) {
+        await scanEntries(child, newPath, scannedFiles, scannedFolders);
+      }
+      entries = await readEntries();
+    }
+  }
+};
+
 const handleFolderUpload = async (event: Event) => {
   const target = event.target as HTMLInputElement;
   if (!target.files || target.files.length === 0) return;
@@ -258,95 +288,62 @@ const handleFolderUpload = async (event: Event) => {
     return;
   }
 
-  const folderMap = new Map<string, string>();
-  const rootParentId = currentFolderContent.value?.folderId || null;
-
+  const folderPathsSet = new Set<string>();
   for (const file of files) {
     const pathParts = file.webkitRelativePath.split('/');
-    pathParts.pop(); 
+    pathParts.pop();
     
-    let currentParent = rootParentId;
     let currentPath = '';
-
     for (const part of pathParts) {
       currentPath = currentPath ? `${currentPath}/${part}` : part;
-      
-      if (!folderMap.has(currentPath)) {
-        try {
-          const res = await api.post('/api/directory/folder', {
-            name: part,
-            parentId: currentParent
-          });
-          const newId = res.data.folderId || res.data.FolderId || res.data.id;
-          folderMap.set(currentPath, newId);
-          currentParent = newId;
-        } catch (e) {
-          console.error(e);
-          break;
+      folderPathsSet.add(currentPath);
+    }
+  }
+
+  const rootParentId = currentFolderContent.value?.folderId || null;
+
+  try {
+    const treeRes = await api.post<Record<string, string>>('/api/directory/folder-tree', {
+      parentId: rootParentId,
+      folderPaths: Array.from(folderPathsSet)
+    });
+    
+    const pathMap = treeRes.data;
+    const filesByFolder = new Map<string, File[]>();
+    const rootFiles: File[] = [];
+
+    for (const file of files) {
+      const pathParts = file.webkitRelativePath.split('/');
+      pathParts.pop();
+      const fileFolderPath = pathParts.join('/');
+
+      if (fileFolderPath) {
+        if (!filesByFolder.has(fileFolderPath)) {
+          filesByFolder.set(fileFolderPath, []);
         }
+        filesByFolder.get(fileFolderPath)!.push(file);
       } else {
-        currentParent = folderMap.get(currentPath)!;
+        rootFiles.push(file);
       }
     }
 
-    await uploadFiles([file], currentParent, true);
-  }
-
-  isUploading.value = false;
-  target.value = '';
-  await openFolder(rootParentId);
-};
-
-const getFileFromEntry = (entry: FSFileEntry): Promise<File> => {
-  return new Promise((resolve) => entry.file(resolve));
-};
-
-const readDirectoryEntries = async (dirReader: FSDirectoryReader): Promise<FSEntry[]> => {
-  const entries: FSEntry[] = [];
-  let readEntries = await new Promise<FSEntry[]>((resolve) => dirReader.readEntries(resolve));
-  while (readEntries.length > 0) {
-    entries.push(...readEntries);
-    readEntries = await new Promise<FSEntry[]>((resolve) => dirReader.readEntries(resolve));
-  }
-  return entries;
-};
-
-const processEntryRecursive = async (entry: FSEntry, targetFolderId: string | null) => {
-  if (entry.isFile) {
-    const file = await getFileFromEntry(entry as FSFileEntry);
-    if (isValidFile(file)) {
-      await uploadFiles([file], targetFolderId, true);
-    }
-  } else if (entry.isDirectory) {
-    let newFolderId = targetFolderId;
-    
-    try {
-      const res = await api.post('/api/directory/folder', {
-        name: entry.name,
-        parentId: targetFolderId
-      });
-      newFolderId = res.data.folderId || res.data.FolderId || res.data.id;
-    } catch (e) {
-      console.error(e);
-      return; 
+    if (rootFiles.length > 0) {
+      await uploadFiles(rootFiles, rootParentId, true);
     }
 
-    const dirReader = (entry as FSDirectoryEntry).createReader();
-    const entries = await readDirectoryEntries(dirReader);
-    const filesToUpload: File[] = [];
-    
-    for (const childEntry of entries) {
-      if (childEntry.isFile) {
-        const file = await getFileFromEntry(childEntry as FSFileEntry);
-        if (isValidFile(file)) filesToUpload.push(file);
-      } else if (childEntry.isDirectory) {
-        await processEntryRecursive(childEntry, newFolderId);
+    for (const [folderPath, folderFiles] of filesByFolder.entries()) {
+      const targetFolderId = pathMap[folderPath];
+      if (targetFolderId) {
+        await uploadFiles(folderFiles, targetFolderId, true);
       }
     }
-
-    if (filesToUpload.length > 0) {
-      await uploadFiles(filesToUpload, newFolderId, true);
-    }
+  } catch (e) {
+    console.error(e);
+    alert("Помилка завантаження структури");
+  } finally {
+    isUploading.value = false;
+    target.value = '';
+    await openFolder(rootParentId);
   }
 };
 
@@ -376,27 +373,58 @@ const handleDrop = async (e: DragEvent) => {
 
   const items = Array.from(e.dataTransfer.items);
   const currentParentId = currentFolderContent.value?.folderId || null;
-  const rootFiles: File[] = [];
+  
+  const scannedFiles: ScannedFile[] = [];
+  const scannedFolders = new Set<string>();
 
   for (const item of items) {
     const entry = item.webkitGetAsEntry() as FSEntry | null;
     if (!entry) continue;
+    await scanEntries(entry, '', scannedFiles, scannedFolders);
+  }
 
-    if (entry.isFile) {
-      const file = await getFileFromEntry(entry as FSFileEntry);
-      if (isValidFile(file)) rootFiles.push(file);
-    } else if (entry.isDirectory) {
-      await processEntryRecursive(entry, currentParentId);
+  try {
+    let pathMap: Record<string, string> = {};
+    if (scannedFolders.size > 0) {
+      const treeRes = await api.post<Record<string, string>>('/api/directory/folder-tree', {
+        parentId: currentParentId,
+        folderPaths: Array.from(scannedFolders)
+      });
+      pathMap = treeRes.data;
     }
-  }
 
-  if (rootFiles.length > 0) {
-    await uploadFiles(rootFiles, currentParentId, true);
-  }
+    const filesByFolder = new Map<string, File[]>();
+    const rootFiles: File[] = [];
 
-  isUploading.value = false;
-  uploadProgress.value = 0;
-  await openFolder(currentFolderContent.value?.folderId || null);
+    for (const sf of scannedFiles) {
+      if (sf.relPath) {
+        if (!filesByFolder.has(sf.relPath)) {
+          filesByFolder.set(sf.relPath, []);
+        }
+        filesByFolder.get(sf.relPath)!.push(sf.file);
+      } else {
+        rootFiles.push(sf.file);
+      }
+    }
+
+    if (rootFiles.length > 0) {
+      await uploadFiles(rootFiles, currentParentId, true);
+    }
+
+    for (const [folderPath, folderFiles] of filesByFolder.entries()) {
+      const targetFolderId = pathMap[folderPath];
+      if (targetFolderId) {
+        await uploadFiles(folderFiles, targetFolderId, true);
+      }
+    }
+  } catch (e) {
+    console.error(e);
+    alert("Помилка завантаження");
+  } finally {
+    isUploading.value = false;
+    uploadProgress.value = 0;
+    await openFolder(currentFolderContent.value?.folderId || null);
+  }
 };
 
 const viewFile = async (file: FileEntry) => {
@@ -675,7 +703,7 @@ onUnmounted(() => {
               </div>
 
               <div v-if="!currentFolderContent?.folders?.length && !currentFolderContent?.files?.length && !isDragging" class="h-100 d-flex flex-column align-items-center justify-content-center text-muted animate__fadeIn py-5 mt-5">
-                  </div>
+              </div>
             </div>
         </div>
 

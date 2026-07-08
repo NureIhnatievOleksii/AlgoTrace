@@ -90,57 +90,6 @@ namespace AlgoTrace.Server.Services
             return newFolder;
         }
 
-        public async Task<Dictionary<string, Guid>> CreateFolderTreeAsync(CreateFolderTreeRequest model, string userId)
-        {
-            var pathMap = new Dictionary<string, Guid>();
-            if (model.FolderPaths == null || !model.FolderPaths.Any())
-            {
-                return pathMap;
-            }
-
-            var sortedPaths = model.FolderPaths.OrderBy(p => p.Split('/').Length).ToList();
-
-            foreach (var path in sortedPaths)
-            {
-                var parts = path.Split('/');
-                var folderName = parts.Last();
-
-                Guid? currentParentId = model.ParentId;
-                if (parts.Length > 1)
-                {
-                    var parentPath = string.Join("/", parts.SkipLast(1));
-                    if (pathMap.TryGetValue(parentPath, out var parentGuid))
-                    {
-                        currentParentId = parentGuid;
-                    }
-                }
-
-                var existingFolder = await _context.Folders.FirstOrDefaultAsync(f =>
-                    f.UserId == userId &&
-                    f.Name == folderName &&
-                    f.ParentId == currentParentId);
-
-                if (existingFolder != null)
-                {
-                    pathMap[path] = existingFolder.FolderId;
-                }
-                else
-                {
-                    var newFolder = new Folder
-                    {
-                        Name = folderName,
-                        ParentId = currentParentId,
-                        UserId = userId
-                    };
-                    _context.Folders.Add(newFolder);
-                    await _context.SaveChangesAsync();
-                    pathMap[path] = newFolder.FolderId;
-                }
-            }
-
-            return pathMap;
-        }
-
         public async Task<bool> RenameFolderAsync(Guid folderId, string newName, string userId)
         {
             var folder = await _context.Folders.FirstOrDefaultAsync(f =>

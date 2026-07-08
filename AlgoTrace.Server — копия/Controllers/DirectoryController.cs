@@ -47,13 +47,6 @@ namespace AlgoTrace.Server.Controllers
             return Ok(newFolder);
         }
 
-        [HttpPost("folder-tree")]
-        public async Task<IActionResult> CreateFolderTree([FromBody] CreateFolderTreeRequest model)
-        {
-            var result = await _directoryService.CreateFolderTreeAsync(model, GetUserId());
-            return Ok(result);
-        }
-
         [HttpPut("folder/{id}/rename")]
         public async Task<IActionResult> RenameFolder(Guid id, [FromBody] string newName)
         {
